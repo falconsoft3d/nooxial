@@ -1,0 +1,261 @@
+{% extends "dashboard_base.html" %}
+
+{% block title %}{% if editing %}{{ target.get_full_name|default:target.username }}{% else %}Nuevo usuario{% endif %} – Nooxial{% endblock %}
+
+{% block topbar %}
+<nav class="flex items-center gap-1.5 text-sm text-gray-400">
+  <a href="{% url 'courses:dashboard' %}" class="hover:text-gray-700">Inicio</a>
+  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <a href="{% url 'accounts:admin_users' %}" class="hover:text-gray-700">Usuarios</a>
+  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <span class="text-gray-900 font-semibold">
+    {% if editing %}{{ target.get_full_name|default:target.username }}{% else %}Nuevo usuario{% endif %}
+  </span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<form method="POST" id="user-form">
+{% csrf_token %}
+
+<!-- ── ODOO-STYLE HEADER BAR ───────────────────────────────── -->
+<div class="bg-white rounded-2xl border border-gray-100 mb-5">
+
+  <!-- Top action bar -->
+  <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+
+    <!-- Left: back + status -->
+    <div class="flex items-center gap-3">
+      <a href="{% url 'accounts:admin_users' %}"
+         class="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+      </a>
+      <div>
+        <h1 class="text-lg font-bold text-gray-900">
+          {% if editing %}{{ target.get_full_name|default:target.username }}
+          {% else %}Nuevo usuario{% endif %}
+        </h1>
+        {% if editing %}
+        <p class="text-xs text-gray-400 mt-0.5">ID #{{ target.pk }} · Miembro desde {{ target.date_joined|date:"d M Y" }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Right: action buttons -->
+    <div class="flex items-center gap-2">
+      {% if editing %}
+      <!-- Status toggle badge -->
+      <span class="text-xs font-semibold px-3 py-1.5 rounded-full mr-2
+        {% if target.is_active %}bg-brand-50 text-brand-700{% else %}bg-red-50 text-red-600{% endif %}">
+        {% if target.is_active %}● Activo{% else %}● Inactivo{% endif %}
+      </span>
+      {% endif %}
+
+      <a href="{% url 'accounts:admin_users' %}"
+         class="text-sm font-semibold text-gray-500 border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-50 transition-colors">
+        Descartar
+      </a>
+      <button type="submit" name="action" value="save"
+              class="flex items-center gap-2 text-sm font-bold bg-brand-300 text-gray-900 px-4 py-2 rounded-xl hover:bg-brand-400 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+        </svg>
+        Guardar
+      </button>
+      {% if editing and not target.is_superuser %}
+      <button type="submit" name="action" value="delete"
+              onclick="return confirm('¿Eliminar al usuario {{ target.username }}? Esta acción no se puede deshacer.')"
+              class="flex items-center gap-2 text-sm font-semibold text-red-600 border border-red-200 px-4 py-2 rounded-xl hover:bg-red-50 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+        </svg>
+        Eliminar
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Messages -->
+  {% if messages %}
+  <div class="px-6 py-3 border-b border-gray-100 space-y-2">
+    {% for message in messages %}
+    <div class="flex items-center gap-2 text-sm rounded-xl px-4 py-2.5
+      {% if message.tags == 'error' %}bg-red-50 text-red-700{% else %}bg-brand-50 text-green-800{% endif %}">
+      {% if message.tags == 'error' %}
+      <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      {% else %}
+      <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+      </svg>
+      {% endif %}
+      {{ message }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- ── FORM BODY ─────────────────────────────────────────── -->
+  <div class="p-6 grid md:grid-cols-2 gap-6">
+
+    <!-- Group 1: Información personal -->
+    <div>
+      <h2 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Información personal</h2>
+      <div class="space-y-4">
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="odoo-label">Nombre</label>
+            <input type="text" name="first_name" value="{{ target.first_name|default:'' }}"
+                   placeholder="Juan"
+                   class="odoo-input" />
+          </div>
+          <div>
+            <label class="odoo-label">Apellido</label>
+            <input type="text" name="last_name" value="{{ target.last_name|default:'' }}"
+                   placeholder="García"
+                   class="odoo-input" />
+          </div>
+        </div>
+
+        <div>
+          <label class="odoo-label">Nombre de usuario <span class="text-red-400">*</span></label>
+          <div class="relative">
+            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
+            <input type="text" name="username" value="{{ target.username|default:'' }}"
+                   placeholder="juangarcia" required
+                   class="odoo-input pl-7" />
+          </div>
+        </div>
+
+        <div>
+          <label class="odoo-label">Correo electrónico</label>
+          <input type="email" name="email" value="{{ target.email|default:'' }}"
+                 placeholder="correo@ejemplo.com"
+                 class="odoo-input" />
+        </div>
+
+        <div>
+          <label class="odoo-label">
+            Contraseña{% if editing %} <span class="text-gray-400 font-normal">(dejar vacío para no cambiar)</span>{% else %} <span class="text-red-400">*</span>{% endif %}
+          </label>
+          <div class="relative">
+            <input type="password" name="password" id="pwd-field"
+                   placeholder="{% if editing %}••••••••{% else %}Mínimo 8 caracteres{% endif %}"
+                   {% if not editing %}required{% endif %}
+                   class="odoo-input pr-10" />
+            <button type="button" onclick="togglePwd()"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Group 2: Permisos y estado -->
+    <div>
+      <h2 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Permisos y estado</h2>
+      <div class="space-y-3">
+
+        <!-- Toggle: Activo -->
+        <label class="odoo-toggle-row">
+          <div>
+            <p class="text-sm font-semibold text-gray-800">Cuenta activa</p>
+            <p class="text-xs text-gray-400 mt-0.5">El usuario puede iniciar sesión</p>
+          </div>
+          <div class="relative">
+            <input type="checkbox" name="is_active" id="tog-active"
+                   {% if target.is_active or not editing %}checked{% endif %}
+                   class="sr-only peer" />
+            <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-brand-400 transition-colors cursor-pointer"
+                 onclick="document.getElementById('tog-active').click()"></div>
+            <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5 pointer-events-none"></div>
+          </div>
+        </label>
+
+        <div class="border-t border-gray-100"></div>
+
+        <!-- Toggle: Staff -->
+        <label class="odoo-toggle-row">
+          <div>
+            <p class="text-sm font-semibold text-gray-800">Acceso Staff</p>
+            <p class="text-xs text-gray-400 mt-0.5">Puede acceder al panel de administración</p>
+          </div>
+          <div class="relative">
+            <input type="checkbox" name="is_staff" id="tog-staff"
+                   {% if target.is_staff %}checked{% endif %}
+                   class="sr-only peer" />
+            <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-brand-400 transition-colors cursor-pointer"
+                 onclick="document.getElementById('tog-staff').click()"></div>
+            <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5 pointer-events-none"></div>
+          </div>
+        </label>
+
+        <!-- Toggle: Superuser -->
+        <label class="odoo-toggle-row">
+          <div>
+            <p class="text-sm font-semibold text-gray-800">Superadministrador</p>
+            <p class="text-xs text-gray-400 mt-0.5">Todos los permisos sin restricciones</p>
+          </div>
+          <div class="relative">
+            <input type="checkbox" name="is_superuser" id="tog-super"
+                   {% if target.is_superuser %}checked{% endif %}
+                   class="sr-only peer" />
+            <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-purple-400 transition-colors cursor-pointer"
+                 onclick="document.getElementById('tog-super').click()"></div>
+            <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5 pointer-events-none"></div>
+          </div>
+        </label>
+
+        {% if editing %}
+        <div class="border-t border-gray-100 pt-3 space-y-2">
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-400">Último acceso</span>
+            <span class="text-gray-700 font-medium">
+              {% if target.last_login %}{{ target.last_login|date:"d M Y, H:i" }}{% else %}Nunca{% endif %}
+            </span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-400">Cursos inscritos</span>
+            <span class="text-gray-700 font-medium">{{ target.enrollments.count }}</span>
+          </div>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</form>
+
+<!-- Tailwind inline styles helpers via CDN config -->
+<style>
+  .odoo-label  { display: block; font-size: .75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .375rem; }
+  .odoo-input  { width: 100%; border: 1px solid #e5e7eb; border-radius: .75rem; padding: .625rem .875rem; font-size: .875rem; color: #111827; transition: all .15s; outline: none; }
+  .odoo-input:focus { border-color: transparent; box-shadow: 0 0 0 2px #9fe870; }
+  .odoo-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; cursor: default; }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function togglePwd() {
+    const f = document.getElementById('pwd-field');
+    f.type = f.type === 'password' ? 'text' : 'password';
+  }
+</script>
+{% endblock %}

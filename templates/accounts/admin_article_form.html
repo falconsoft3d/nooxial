@@ -1,0 +1,98 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{% if editing %}Editar artículo{% else %}Nuevo artículo{% endif %} – Admin{% endblock %}
+{% block topbar %}
+<div class="flex items-center gap-4">
+  <a href="{% url 'accounts:admin_articles' %}" class="text-gray-400 hover:text-gray-700">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+    </svg>
+  </a>
+  <h1 class="text-lg font-bold text-gray-900">{% if editing %}Editar artículo{% else %}Nuevo artículo{% endif %}</h1>
+</div>
+{% endblock %}
+{% block content %}
+{% if messages %}
+<div class="mb-4 space-y-2">
+  {% for msg in messages %}
+  <div class="px-4 py-3 rounded-xl text-sm font-medium {% if msg.tags == 'error' %}bg-red-50 text-red-700{% else %}bg-brand-50 text-brand-700{% endif %}">{{ msg }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <div class="grid md:grid-cols-3 gap-6">
+
+    <!-- Columna principal -->
+    <div class="md:col-span-2 space-y-5">
+      <div class="bg-white rounded-3xl border border-gray-100 p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Título</label>
+          <input type="text" name="title" value="{{ target.title|default:'' }}" required
+                 class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Resumen <span class="font-normal text-gray-300">(opcional)</span></label>
+          <textarea name="summary" rows="2"
+                    class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 resize-none">{{ target.summary|default:'' }}</textarea>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Contenido</label>
+          <textarea name="content" rows="16" required
+                    class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 resize-y font-mono">{{ target.content|default:'' }}</textarea>
+          <p class="text-xs text-gray-400 mt-1">Puedes usar saltos de línea para separar párrafos.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Columna lateral -->
+    <div class="space-y-5">
+      <!-- Publicación -->
+      <div class="bg-white rounded-3xl border border-gray-100 p-5">
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Publicación</p>
+        <div class="flex items-center gap-3 mb-5">
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" name="is_published" class="sr-only peer"
+                   {% if target.is_published %}checked{% endif %}>
+            <div class="w-10 h-5 bg-gray-200 peer-checked:bg-brand-400 rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
+          </label>
+          <span class="text-sm font-medium text-gray-700">Publicado</span>
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" class="flex-1 bg-gray-900 text-white text-sm font-semibold py-2.5 rounded-full hover:bg-gray-700 transition-colors">
+            {% if editing %}Guardar{% else %}Crear{% endif %}
+          </button>
+          {% if editing and target.is_published %}
+          <a href="/blog/{{ target.slug }}/" target="_blank"
+             class="text-sm font-medium text-gray-500 border border-gray-200 px-4 py-2.5 rounded-full hover:bg-gray-50 transition-colors">
+            Ver
+          </a>
+          {% endif %}
+        </div>
+        {% if editing %}
+        <button type="submit" name="action" value="delete"
+                onclick="return confirm('¿Eliminar este artículo?')"
+                class="mt-3 w-full text-sm font-semibold text-red-500 hover:text-red-700 py-2">
+          Eliminar artículo
+        </button>
+        {% endif %}
+      </div>
+
+      <!-- Imagen de portada -->
+      <div class="bg-white rounded-3xl border border-gray-100 p-5">
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Imagen de portada</p>
+        {% if target.cover_image %}
+        <img src="{{ target.cover_image.url }}" alt="" class="w-full h-36 object-cover rounded-xl mb-3">
+        {% endif %}
+        <label class="flex flex-col items-center gap-2 border-2 border-dashed border-gray-200 rounded-xl p-5 cursor-pointer hover:border-brand-300 transition-colors">
+          <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+          <span class="text-xs text-gray-500">{% if target.cover_image %}Cambiar imagen{% else %}Subir imagen{% endif %}</span>
+          <input type="file" name="cover_image" accept="image/*" class="hidden">
+        </label>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

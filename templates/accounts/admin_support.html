@@ -1,0 +1,45 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Soporte – Admin{% endblock %}
+{% block topbar %}
+<div class="flex items-center justify-between w-full">
+  <div>
+    <h1 class="text-lg font-bold text-gray-900">Soporte</h1>
+    <p class="text-sm text-gray-400">{{ open_count }} abierto{{ open_count|pluralize:"s" }} · {{ unread_count }} sin leer</p>
+  </div>
+</div>
+{% endblock %}
+{% block content %}
+<div class="space-y-3">
+  {% for ticket in tickets %}
+  <a href="{% url 'accounts:admin_support_thread' ticket.pk %}"
+     class="flex items-center gap-4 bg-white rounded-2xl border border-gray-100 px-5 py-4 hover:shadow-sm transition-shadow">
+    <div class="w-10 h-10 rounded-full bg-brand-300 flex items-center justify-center font-black text-sm text-gray-900 flex-shrink-0">
+      {{ ticket.user.first_name|first|upper }}{{ ticket.user.last_name|first|upper }}
+    </div>
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2">
+        <p class="font-semibold text-gray-900 text-sm">{{ ticket.user.get_full_name|default:ticket.user.username }}</p>
+        {% if ticket.unread_by_staff %}
+        <span class="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">Nuevo</span>
+        {% endif %}
+      </div>
+      {% with last=ticket.messages.last %}
+      <p class="text-sm text-gray-500 truncate">{{ last.content|default:"Sin mensajes" }}</p>
+      {% endwith %}
+    </div>
+    <div class="text-right flex-shrink-0">
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full
+        {% if ticket.status == 'open' %}bg-brand-50 text-brand-700{% else %}bg-gray-100 text-gray-400{% endif %}">
+        {% if ticket.status == 'open' %}Abierto{% else %}Cerrado{% endif %}
+      </span>
+      <p class="text-xs text-gray-400 mt-1">{{ ticket.updated_at|date:"d/m H:i" }}</p>
+    </div>
+  </a>
+  {% empty %}
+  <div class="text-center py-16 text-gray-400">
+    <p class="text-4xl mb-3">💬</p>
+    <p class="font-medium">No hay tickets de soporte.</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

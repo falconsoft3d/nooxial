@@ -1,0 +1,71 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Ticket #{{ ticket.pk }} – Soporte{% endblock %}
+{% block topbar %}
+<div class="flex items-center gap-4">
+  <a href="{% url 'accounts:admin_support' %}" class="text-gray-400 hover:text-gray-700">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+    </svg>
+  </a>
+  <div>
+    <h1 class="text-lg font-bold text-gray-900">
+      {{ ticket.user.get_full_name|default:ticket.user.username }}
+      <span class="text-gray-400 font-normal text-sm">#{{ ticket.pk }}</span>
+    </h1>
+    <p class="text-sm text-gray-400">{{ ticket.user.email }} · Abierto {{ ticket.created_at|date:"d/m/Y H:i" }}</p>
+  </div>
+</div>
+{% endblock %}
+{% block content %}
+<div class="max-w-2xl space-y-4">
+
+  <!-- Mensajes -->
+  <div class="bg-white rounded-3xl border border-gray-100 p-5 space-y-4" style="min-height:300px;">
+    {% for msg in messages %}
+    <div class="flex {% if msg.is_staff_reply %}justify-end{% endif %} gap-3">
+      {% if not msg.is_staff_reply %}
+      <div class="w-8 h-8 rounded-full bg-brand-300 flex items-center justify-center text-xs font-black text-gray-900 flex-shrink-0">
+        {{ ticket.user.first_name|first|upper }}{{ ticket.user.last_name|first|upper }}
+      </div>
+      {% endif %}
+      <div class="max-w-sm">
+        <div class="px-4 py-3 rounded-2xl text-sm {% if msg.is_staff_reply %}bg-gray-900 text-white{% else %}bg-gray-100 text-gray-900{% endif %}">
+          {{ msg.content }}
+        </div>
+        <p class="text-xs text-gray-400 mt-1 {% if msg.is_staff_reply %}text-right{% endif %}">
+          {{ msg.author.get_full_name|default:msg.author.username }} · {{ msg.created_at|date:"d/m H:i" }}
+        </p>
+      </div>
+    </div>
+    {% empty %}
+    <p class="text-sm text-gray-400 text-center py-8">Sin mensajes aún.</p>
+    {% endfor %}
+  </div>
+
+  <!-- Formulario de respuesta -->
+  {% if ticket.status == 'open' %}
+  <form method="post" action="{% url 'accounts:admin_support_reply' ticket.pk %}"
+        class="bg-white rounded-3xl border border-gray-100 p-5">
+    {% csrf_token %}
+    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Responder</label>
+    <textarea name="content" rows="3" required placeholder="Escribe tu respuesta…"
+              class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 resize-none mb-3"></textarea>
+    <div class="flex items-center gap-3">
+      <button type="submit"
+              class="bg-gray-900 text-white text-sm font-semibold px-6 py-2.5 rounded-full hover:bg-gray-700 transition-colors">
+        Enviar respuesta
+      </button>
+      <button type="submit" name="action" value="close"
+              class="text-sm font-medium text-gray-500 border border-gray-200 px-5 py-2.5 rounded-full hover:bg-gray-50 transition-colors">
+        Responder y cerrar
+      </button>
+    </div>
+  </form>
+  {% else %}
+  <div class="bg-gray-50 rounded-2xl p-4 text-center text-sm text-gray-500">
+    Ticket cerrado.
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

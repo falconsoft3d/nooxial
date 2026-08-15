@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Resultado – {{ attempt.exam.title }}{% endblock %}
+{% block body %}
+<header class="sticky top-0 z-50 bg-white border-b border-gray-100">
+  <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="/" class="text-2xl font-black text-gray-900"><span class="text-brand-400">N</span>ooxial</a>
+    <a href="{% url 'courses:course_detail' course.slug %}" class="text-sm font-medium text-gray-600 hover:text-gray-900">← Volver al curso</a>
+  </div>
+</header>
+
+<section class="py-16 px-6">
+  <div class="max-w-lg mx-auto text-center">
+
+    {% if attempt.passed %}
+    <div class="w-24 h-24 rounded-full bg-brand-300 flex items-center justify-center mx-auto mb-6 text-5xl">🏆</div>
+    <h1 class="text-4xl font-black text-gray-900 mb-2">¡Aprobado!</h1>
+    <p class="text-gray-500 text-lg">Enhorabuena, has superado el examen.</p>
+    {% else %}
+    <div class="w-24 h-24 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-6 text-5xl">😓</div>
+    <h1 class="text-4xl font-black text-gray-900 mb-2">No aprobado</h1>
+    <p class="text-gray-500 text-lg">Puedes volver a intentarlo cuando quieras.</p>
+    {% endif %}
+
+    <!-- Puntuación -->
+    <div class="mt-8 bg-white rounded-3xl border border-gray-100 p-8">
+      <p class="text-6xl font-black {% if attempt.passed %}text-brand-500{% else %}text-red-500{% endif %} mb-1">
+        {{ attempt.score }}%
+      </p>
+      <p class="text-sm text-gray-400">Nota mínima: {{ attempt.exam.passing_score }}%</p>
+
+      <!-- Barra -->
+      <div class="mt-5 bg-gray-100 rounded-full h-3 w-full">
+        <div class="h-3 rounded-full transition-all {% if attempt.passed %}bg-brand-400{% else %}bg-red-400{% endif %}"
+             style="width: {{ attempt.score }}%"></div>
+      </div>
+    </div>
+
+    <!-- Historial -->
+    {% if all_attempts.count > 1 %}
+    <div class="mt-6 bg-white rounded-3xl border border-gray-100 p-5 text-left">
+      <h2 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Historial de intentos</h2>
+      <div class="divide-y divide-gray-50">
+        {% for att in all_attempts %}
+        <div class="flex items-center justify-between py-2.5 {% if att.pk == attempt.pk %}font-semibold{% endif %}">
+          <span class="text-sm text-gray-600">{{ att.attempted_at|date:"d/m/Y H:i" }}</span>
+          <span class="text-sm font-bold {% if att.passed %}text-brand-600{% else %}text-red-500{% endif %}">{{ att.score }}%</span>
+          {% if att.passed %}<span class="text-xs text-brand-600">✓ Aprobado</span>{% else %}<span class="text-xs text-red-400">✗</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Acciones -->
+    <div class="mt-8 flex flex-col gap-3">
+      {% if can_download %}
+      <a href="{% url 'courses:certificate' course.slug %}"
+         class="block bg-brand-300 text-gray-900 font-bold py-3.5 rounded-full hover:bg-brand-400 transition-colors text-center">
+        🏆 Descargar certificado
+      </a>
+      {% endif %}
+      <a href="{% url 'courses:take_exam' course.slug %}"
+         class="block bg-gray-900 text-white font-bold py-3.5 rounded-full hover:bg-gray-700 transition-colors text-center">
+        {% if attempt.passed %}Repetir examen{% else %}Intentar de nuevo{% endif %}
+      </a>
+      <a href="{% url 'courses:course_detail' course.slug %}"
+         class="block bg-gray-100 text-gray-900 font-semibold py-3.5 rounded-full hover:bg-gray-200 transition-colors text-center">
+        Volver al curso
+      </a>
+    </div>
+
+  </div>
+</section>
+{% endblock %}

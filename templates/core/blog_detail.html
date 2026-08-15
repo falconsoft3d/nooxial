@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}{{ article.title }} – Blog Nooxial{% endblock %}
+{% block body %}
+
+<!-- Navbar -->
+<header class="sticky top-0 z-50 bg-white border-b border-gray-100">
+  <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="/" class="text-2xl font-black text-gray-900"><span class="text-brand-400">N</span>ooxial</a>
+    <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
+      <a href="/" class="hover:text-gray-900">Inicio</a>
+      <a href="/dashboard/cursos/" class="hover:text-gray-900">Cursos</a>
+      <a href="/blog/" class="font-semibold text-gray-900">Blog</a>
+    </nav>
+    <div class="flex items-center gap-3">
+      {% if user.is_authenticated %}
+      <a href="{% url 'courses:dashboard' %}" class="bg-gray-900 text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-gray-700 transition-colors">Dashboard</a>
+      {% else %}
+      <a href="{% url 'accounts:login' %}" class="text-sm font-medium text-gray-700 hover:text-gray-900 px-4 py-2">Inicia sesión</a>
+      <a href="{% url 'accounts:register' %}" class="bg-gray-900 text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-gray-700 transition-colors">Regístrate</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+<!-- Artículo -->
+<article class="max-w-3xl mx-auto px-6 py-14">
+
+  <!-- Volver -->
+  <a href="/blog/" class="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 mb-8">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+    </svg>
+    Blog
+  </a>
+
+  <!-- Cabecera -->
+  <header class="mb-8">
+    <h1 class="text-4xl md:text-5xl font-black text-gray-900 leading-tight mb-4">{{ article.title }}</h1>
+    <div class="flex items-center gap-4 text-sm text-gray-500">
+      {% if article.author.profile.photo %}
+      <img src="{{ article.author.profile.photo.url }}" alt=""
+           class="w-8 h-8 rounded-full object-cover">
+      {% else %}
+      <div class="w-8 h-8 rounded-full bg-brand-300 flex items-center justify-center text-xs font-black text-gray-900">
+        {{ article.author.first_name|first|upper }}{{ article.author.last_name|first|upper }}
+      </div>
+      {% endif %}
+      <span class="font-medium text-gray-700">{{ article.author.get_full_name|default:article.author.username }}</span>
+      <span>·</span>
+      <span>{{ article.created_at|date:"d/m/Y" }}</span>
+    </div>
+  </header>
+
+  <!-- Imagen portada -->
+  {% if article.cover_image %}
+  <div class="rounded-3xl overflow-hidden mb-10">
+    <img src="{{ article.cover_image.url }}" alt="{{ article.title }}" class="w-full max-h-96 object-cover">
+  </div>
+  {% endif %}
+
+  <!-- Contenido -->
+  <div class="prose prose-lg max-w-none text-gray-700 leading-relaxed">
+    {{ article.content|linebreaks }}
+  </div>
+
+  <!-- ─── COMENTARIOS ──────────────────────────────────────── -->
+  <section id="comentarios" class="mt-14 pt-10 border-t border-gray-100">
+    <h2 class="text-2xl font-bold text-gray-900 mb-8">
+      Comentarios
+      {% if comments %}<span class="text-gray-400 font-normal text-lg">({{ comments|length }})</span>{% endif %}
+    </h2>
+
+    <!-- Lista de comentarios -->
+    {% if comments %}
+    <div class="space-y-5 mb-10">
+      {% for comment in comments %}
+      <div class="flex gap-4">
+        {% if comment.author.profile.photo %}
+        <img src="{{ comment.author.profile.photo.url }}" alt=""
+             class="w-10 h-10 rounded-full object-cover flex-shrink-0">
+        {% else %}
+        <div class="w-10 h-10 rounded-full bg-brand-300 flex items-center justify-center font-black text-sm text-gray-900 flex-shrink-0">
+          {{ comment.author.first_name|first|upper }}{{ comment.author.last_name|first|upper }}
+        </div>
+        {% endif %}
+        <div class="flex-1">
+          <div class="bg-gray-50 rounded-2xl px-5 py-4">
+            <div class="flex items-center gap-3 mb-1">
+              <p class="font-semibold text-sm text-gray-900">
+                {{ comment.author.get_full_name|default:comment.author.username }}
+              </p>
+              <span class="text-xs text-gray-400">{{ comment.created_at|date:"d/m/Y H:i" }}</span>
+            </div>
+            <p class="text-sm text-gray-700">{{ comment.content }}</p>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Formulario de comentario -->
+    {% if user.is_authenticated %}
+    <form method="post" action="/blog/{{ article.slug }}/comentar/" class="flex gap-4">
+      {% csrf_token %}
+      {% if user.profile.photo %}
+      <img src="{{ user.profile.photo.url }}" alt=""
+           class="w-10 h-10 rounded-full object-cover flex-shrink-0 mt-1">
+      {% else %}
+      <div class="w-10 h-10 rounded-full bg-brand-300 flex items-center justify-center font-black text-sm text-gray-900 flex-shrink-0 mt-1">
+        {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+      </div>
+      {% endif %}
+      <div class="flex-1">
+        <textarea name="content" rows="3" required placeholder="Escribe un comentario…"
+                  class="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 resize-none mb-2"></textarea>
+        <button type="submit"
+                class="bg-gray-900 text-white text-sm font-semibold px-6 py-2.5 rounded-full hover:bg-gray-700 transition-colors">
+          Publicar comentario
+        </button>
+      </div>
+    </form>
+    {% else %}
+    <div class="bg-gray-50 rounded-2xl p-6 text-center">
+      <p class="text-gray-600 font-medium">¿Quieres comentar?</p>
+      <p class="text-sm text-gray-400 mt-1 mb-4">Inicia sesión para dejar tu comentario.</p>
+      <a href="/accounts/login/?next=/blog/{{ article.slug }}/#comentarios"
+         class="inline-block bg-gray-900 text-white text-sm font-semibold px-6 py-2.5 rounded-full hover:bg-gray-700 transition-colors">
+        Iniciar sesión
+      </a>
+    </div>
+    {% endif %}
+  </section>
+
+</article>
+
+<!-- Artículos relacionados -->
+{% if related %}
+<section class="bg-gray-50 py-14 px-6 border-t border-gray-100">
+  <div class="max-w-5xl mx-auto">
+    <h2 class="text-2xl font-bold text-gray-900 mb-8">Más artículos</h2>
+    <div class="grid md:grid-cols-3 gap-6">
+      {% for art in related %}
+      <a href="/blog/{{ art.slug }}/"
+         class="bg-white rounded-3xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group">
+        {% if art.cover_image %}
+        <div class="h-36 overflow-hidden">
+          <img src="{{ art.cover_image.url }}" alt="{{ art.title }}"
+               class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+        </div>
+        {% else %}
+        <div class="h-36 bg-brand-100 flex items-center justify-center text-3xl">📝</div>
+        {% endif %}
+        <div class="p-4">
+          <p class="text-xs text-gray-400 mb-1">{{ art.created_at|date:"d/m/Y" }}</p>
+          <h3 class="font-bold text-gray-900 text-sm leading-snug group-hover:text-brand-600">{{ art.title }}</h3>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% endblock %}

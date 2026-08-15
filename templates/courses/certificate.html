@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Certificado – {{ course.title }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+    body { font-family: 'Inter', sans-serif; background: #f9fafb; }
+
+    @media print {
+      body { background: white; }
+      .no-print { display: none !important; }
+      .cert-wrapper { box-shadow: none !important; margin: 0 !important; }
+      @page { size: A4 landscape; margin: 0; }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start py-10 px-4">
+
+  <!-- Barra de acciones (solo pantalla) -->
+  <div class="no-print flex items-center justify-between w-full max-w-4xl mb-6">
+    <a href="{% url 'courses:course_detail' course.slug %}"
+       class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      </svg>
+      Volver al curso
+    </a>
+    <button onclick="window.print()"
+            class="inline-flex items-center gap-2 bg-gray-900 text-white text-sm font-semibold px-6 py-2.5 rounded-full hover:bg-gray-700 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+      Descargar / Imprimir PDF
+    </button>
+  </div>
+
+  <!-- Certificado -->
+  <div class="cert-wrapper w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden border-4 border-gray-900"
+       style="min-height: 560px;">
+
+    <!-- Franja superior verde -->
+    <div class="h-3 bg-gradient-to-r from-green-400 to-emerald-500"></div>
+
+    <div class="px-16 py-14 flex flex-col items-center text-center">
+
+      <!-- Logo -->
+      <div class="mb-8">
+        <span class="text-4xl font-black text-gray-900 tracking-tight">
+          <span style="color:#9fe870;">N</span>ooxial
+        </span>
+      </div>
+
+      <!-- Título -->
+      <p class="text-xs font-bold text-gray-400 uppercase tracking-[0.3em] mb-2">Certifica que</p>
+
+      <!-- Nombre del estudiante -->
+      <h1 class="text-5xl font-black text-gray-900 mb-1">
+        {{ student.get_full_name|default:student.username }}
+      </h1>
+      <div class="w-64 h-0.5 bg-gray-200 my-5 mx-auto"></div>
+
+      <!-- Descripción -->
+      <p class="text-gray-500 text-base mb-2">ha completado satisfactoriamente el curso</p>
+      <h2 class="text-3xl font-black text-gray-900 mb-6">{{ course.title }}</h2>
+
+      <!-- Datos del examen -->
+      <div class="flex items-center gap-8 mt-2 mb-10">
+        <div class="text-center">
+          <p class="text-3xl font-black" style="color:#9fe870;">{{ attempt.score }}%</p>
+          <p class="text-xs text-gray-400 mt-0.5 uppercase tracking-widest">Nota obtenida</p>
+        </div>
+        <div class="w-px h-12 bg-gray-200"></div>
+        <div class="text-center">
+          <p class="text-3xl font-black text-gray-900">{{ attempt.attempted_at|date:"d/m/Y" }}</p>
+          <p class="text-xs text-gray-400 mt-0.5 uppercase tracking-widest">Fecha</p>
+        </div>
+      </div>
+
+      <!-- Firmas + QR -->
+      <div class="border-t border-gray-100 pt-6 w-full flex items-end justify-between gap-4">
+
+        <!-- Firma instructor -->
+        <div class="text-center min-w-0">
+          {% if instructor_signature %}
+          <img src="{{ instructor_signature }}" alt="Firma instructor" class="h-12 mx-auto mb-1 max-w-[160px]">
+          {% else %}
+          <div class="h-12 border-b border-gray-300 w-40 mx-auto mb-1"></div>
+          {% endif %}
+          <p class="text-sm font-semibold text-gray-900">
+            {{ course.instructor.get_full_name|default:course.instructor.username }}
+          </p>
+          <p class="text-xs text-gray-400">Instructor</p>
+        </div>
+
+        <!-- QR verificación -->
+        <div class="flex flex-col items-center flex-shrink-0">
+          {% if qr_code %}
+          <img src="{{ qr_code }}" alt="QR verificación" class="w-20 h-20">
+          <p class="text-xs text-gray-400 mt-1 text-center leading-tight">Escanea para<br>verificar</p>
+          {% else %}
+          <div class="w-16 h-16 rounded-full border-4 flex items-center justify-center"
+               style="border-color:#9fe870;">
+            <svg class="w-8 h-8" style="color:#9fe870;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+            </svg>
+          </div>
+          {% endif %}
+          <p class="text-xs text-gray-400 mt-1 font-mono">#{{ attempt.pk|stringformat:"06d" }}</p>
+        </div>
+
+        <!-- Firma estudiante -->
+        <div class="text-center min-w-0">
+          {% if student_signature %}
+          <img src="{{ student_signature }}" alt="Firma estudiante" class="h-12 mx-auto mb-1 max-w-[160px]">
+          {% else %}
+          <div class="h-12 border-b border-gray-300 w-40 mx-auto mb-1"></div>
+          {% endif %}
+          <p class="text-sm font-semibold text-gray-900">
+            {{ student.get_full_name|default:student.username }}
+          </p>
+          <p class="text-xs text-gray-400">Estudiante</p>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Franja inferior verde -->
+    <div class="h-3 bg-gradient-to-r from-green-400 to-emerald-500"></div>
+  </div>
+
+</body>
+</html>

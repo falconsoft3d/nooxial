@@ -1,0 +1,170 @@
+{% extends "dashboard_base.html" %}
+
+{% block title %}Temas – Nooxial{% endblock %}
+
+{% block topbar %}
+<nav class="flex items-center gap-1.5 text-sm text-gray-400">
+  <a href="{% url 'courses:dashboard' %}" class="hover:text-gray-700">Inicio</a>
+  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <span class="text-gray-900 font-semibold">Temas</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── STAT CARDS ─────────────────────────────────────────── -->
+<div class="grid grid-cols-2 gap-4 mb-6 max-w-sm">
+  <div class="bg-white rounded-2xl border border-gray-100 px-5 py-4">
+    <p class="text-xs text-gray-400 font-medium uppercase tracking-wide">Total</p>
+    <p class="text-3xl font-black text-gray-900 mt-1">{{ total_all }}</p>
+  </div>
+  <div class="bg-white rounded-2xl border border-gray-100 px-5 py-4">
+    <p class="text-xs text-gray-400 font-medium uppercase tracking-wide">Activos</p>
+    <p class="text-3xl font-black text-brand-500 mt-1">{{ active_count }}</p>
+  </div>
+</div>
+
+<!-- ── TOOLBAR ────────────────────────────────────────────── -->
+<div class="bg-white rounded-t-2xl border border-gray-100 border-b-0 px-5 py-3.5 flex items-center gap-3">
+  <a href="{% url 'accounts:admin_topic_new' %}"
+     class="flex items-center gap-2 bg-brand-300 text-gray-900 font-bold text-sm px-4 py-2 rounded-xl hover:bg-brand-400 transition-colors flex-shrink-0">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+    </svg>
+    Nuevo tema
+  </a>
+
+  <form method="GET" class="flex-1 flex items-center gap-3">
+    <div class="relative flex-1 max-w-sm">
+      <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      </svg>
+      <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nombre o descripción…"
+             class="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent" />
+    </div>
+  </form>
+
+  <span class="text-xs text-gray-400 flex-shrink-0">{{ total }} resultado{{ total|pluralize:"s" }}</span>
+</div>
+
+<!-- ── TABLE ──────────────────────────────────────────────── -->
+<div class="bg-white rounded-b-2xl border border-gray-100 overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-gray-100 bg-gray-50 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+        <th class="pl-5 pr-3 py-3 text-left w-8">
+          <input type="checkbox" id="check-all" class="rounded border-gray-300 text-brand-400 focus:ring-brand-300 cursor-pointer"/>
+        </th>
+        <th class="px-3 py-3 text-left">Nombre</th>
+        <th class="px-3 py-3 text-left hidden md:table-cell">Curso</th>
+        <th class="px-3 py-3 text-left hidden lg:table-cell">Descripción</th>
+        <th class="px-3 py-3 text-left">Estado</th>
+        <th class="px-3 py-3 text-right pr-5">Acciones</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-50">
+      {% for topic in page_obj %}
+      <tr class="hover:bg-gray-50 transition-colors cursor-pointer"
+          onclick="location.href='{% url 'accounts:admin_topic_edit' topic.pk %}'">
+        <td class="pl-5 pr-3 py-3.5" onclick="event.stopPropagation()">
+          <input type="checkbox" class="row-check rounded border-gray-300 text-brand-400 focus:ring-brand-300 cursor-pointer"/>
+        </td>
+        <td class="px-3 py-3.5">
+          <div class="flex items-center gap-3">
+            <div class="w-7 h-7 bg-brand-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-3.5 h-3.5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+              </svg>
+            </div>
+            <span class="font-semibold text-gray-900">{{ topic.name }}</span>
+          </div>
+        </td>
+        <td class="px-3 py-3.5 hidden md:table-cell">
+          {% if topic.course %}
+          <span class="bg-blue-50 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+            {{ topic.course.title|truncatechars:35 }}
+          </span>
+          {% else %}
+          <span class="text-gray-400 text-xs">— Sin curso</span>
+          {% endif %}
+        </td>
+        <td class="px-3 py-3.5 text-gray-400 text-xs hidden lg:table-cell max-w-xs truncate">
+          {{ topic.description|default:"—" }}
+        </td>
+        <td class="px-3 py-3.5">
+          {% if topic.is_active %}
+          <span class="inline-flex items-center gap-1 bg-brand-50 text-brand-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+            <span class="w-1.5 h-1.5 bg-brand-500 rounded-full"></span>Activo
+          </span>
+          {% else %}
+          <span class="inline-flex items-center gap-1 bg-gray-100 text-gray-500 text-xs font-semibold px-2.5 py-1 rounded-full">
+            <span class="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>Inactivo
+          </span>
+          {% endif %}
+        </td>
+        <td class="px-3 py-3.5 pr-5 text-right" onclick="event.stopPropagation()">
+          <a href="{% url 'accounts:admin_topic_edit' topic.pk %}"
+             class="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-gray-900
+                    border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+            Editar
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="px-5 py-16 text-center">
+          <div class="flex flex-col items-center gap-3 text-gray-400">
+            <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+            </svg>
+            <p class="font-medium">No hay temas todavía</p>
+            <a href="{% url 'accounts:admin_topic_new' %}" class="text-sm text-brand-600 underline">Crear el primero</a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div class="border-t border-gray-100 px-5 py-3 flex items-center justify-between bg-gray-50">
+    <p class="text-xs text-gray-400">Mostrando {{ page_obj.start_index }}–{{ page_obj.end_index }} de {{ page_obj.paginator.count }}</p>
+    <div class="flex items-center gap-1">
+      {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}"
+         class="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg hover:bg-white transition-colors">← Anterior</a>
+      {% endif %}
+      {% for num in page_obj.paginator.page_range %}
+        {% if num == page_obj.number %}
+        <span class="px-3 py-1.5 text-xs font-bold bg-gray-900 text-white rounded-lg">{{ num }}</span>
+        {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+        <a href="?page={{ num }}{% if q %}&q={{ q }}{% endif %}"
+           class="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg hover:bg-white transition-colors">{{ num }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}"
+         class="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg hover:bg-white transition-colors">Siguiente →</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.getElementById('check-all').addEventListener('change', function() {
+    document.querySelectorAll('.row-check').forEach(cb => cb.checked = this.checked);
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Firma requerida – Nooxial</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+    body { font-family: 'Inter', sans-serif; background: #f9fafb; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center px-4 py-12">
+
+  <div class="w-full max-w-lg">
+
+    <!-- Logo -->
+    <div class="text-center mb-8">
+      <a href="/" class="text-3xl font-black text-gray-900">
+        <span style="color:#9fe870;">N</span>ooxial
+      </a>
+    </div>
+
+    <!-- Card -->
+    <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
+
+      <!-- Header -->
+      <div class="text-center mb-6">
+        <div class="w-14 h-14 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4"
+             style="background:#f0fde4;">
+          <svg class="w-7 h-7" style="color:#9fe870;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+          </svg>
+        </div>
+        <h1 class="text-2xl font-black text-gray-900">Añade tu firma</h1>
+        <p class="text-gray-500 text-sm mt-2">
+          Para generar tu certificado de <strong>{{ course.title }}</strong> necesitas
+          añadir tu firma. Se guardará en tu perfil y podrás editarla cuando quieras.
+        </p>
+      </div>
+
+      <!-- Canvas -->
+      <form method="post" id="sign-form">
+        {% csrf_token %}
+        <input type="hidden" name="signature_data" id="sig-data">
+
+        <div class="mb-1">
+          <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
+            Dibuja tu firma aquí
+          </label>
+          <div class="border-2 border-dashed border-gray-200 rounded-2xl overflow-hidden bg-white cursor-crosshair"
+               style="touch-action: none;">
+            <canvas id="sig-canvas" class="w-full block" style="height:150px;"></canvas>
+          </div>
+          <p class="text-xs text-gray-400 mt-1.5">Usa el ratón o el dedo para firmar en el recuadro.</p>
+        </div>
+
+        <div class="flex items-center gap-3 mt-5">
+          <button type="button" onclick="clearSig()"
+                  class="flex-1 border border-gray-200 text-gray-600 text-sm font-semibold py-3 rounded-full hover:bg-gray-50 transition-colors">
+            Limpiar
+          </button>
+          <button type="button" onclick="submitSig()"
+                  class="flex-1 bg-gray-900 text-white text-sm font-bold py-3 rounded-full hover:bg-gray-700 transition-colors">
+            Guardar y continuar →
+          </button>
+        </div>
+      </form>
+
+      <!-- Link perfil -->
+      <p class="text-center text-xs text-gray-400 mt-5">
+        También puedes añadirla desde
+        <a href="{% url 'accounts:profile' %}" class="font-semibold underline hover:text-gray-700">tu perfil</a>.
+      </p>
+
+    </div>
+
+    <!-- Volver -->
+    <div class="text-center mt-5">
+      <a href="{% url 'courses:course_detail' course.slug %}" class="text-sm text-gray-500 hover:text-gray-800">
+        ← Volver al curso
+      </a>
+    </div>
+
+  </div>
+
+<script>
+(function () {
+  const canvas = document.getElementById('sig-canvas');
+  const ctx    = canvas.getContext('2d');
+  let drawing  = false, lastX = 0, lastY = 0;
+  const dpr    = window.devicePixelRatio || 1;
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width  = rect.width  * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth   = 2.5;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+  }
+  resize();
+
+  function pos(e) {
+    const r = canvas.getBoundingClientRect();
+    const s = e.touches ? e.touches[0] : e;
+    return { x: s.clientX - r.left, y: s.clientY - r.top };
+  }
+
+  canvas.addEventListener('mousedown',  e => { drawing = true; const p = pos(e); lastX = p.x; lastY = p.y; });
+  canvas.addEventListener('mousemove',  e => {
+    if (!drawing) return;
+    const p = pos(e);
+    ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke();
+    lastX = p.x; lastY = p.y;
+  });
+  canvas.addEventListener('mouseup',    () => drawing = false);
+  canvas.addEventListener('mouseleave', () => drawing = false);
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; const p = pos(e); lastX = p.x; lastY = p.y; }, { passive: false });
+  canvas.addEventListener('touchmove',  e => {
+    e.preventDefault();
+    if (!drawing) return;
+    const p = pos(e);
+    ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke();
+    lastX = p.x; lastY = p.y;
+  }, { passive: false });
+  canvas.addEventListener('touchend', () => drawing = false);
+
+  window.clearSig = function () {
+    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+  };
+
+  window.submitSig = function () {
+    // Verificar que hay algo dibujado
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    const hasDrawing = Array.from(data).some((v, i) => i % 4 === 3 && v > 0);
+    if (!hasDrawing) {
+      alert('Por favor dibuja tu firma antes de continuar.');
+      return;
+    }
+    document.getElementById('sig-data').value = canvas.toDataURL('image/png');
+    document.getElementById('sign-form').submit();
+  };
+})();
+</script>
+</body>
+</html>

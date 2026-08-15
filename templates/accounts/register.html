@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Regístrate – Nooxial{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-gray-50 flex flex-col">
+
+  <header class="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+    <a href="/" class="text-xl font-black tracking-tight text-gray-900">
+      <span class="text-brand-400">N</span>ooxial
+    </a>
+    <button onclick="history.back()"
+            class="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-full hover:bg-gray-100">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  </header>
+
+  <main class="flex-1 flex items-start justify-center pt-12 pb-20 px-4">
+    <div class="w-full max-w-md">
+
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Crea tu cuenta</h1>
+        <p class="text-gray-500 mt-2">
+          ¿Ya tienes cuenta?
+          <a href="{% url 'accounts:login' %}" class="text-gray-900 font-semibold underline underline-offset-4 hover:text-brand-600">
+            Inicia sesión
+          </a>
+        </p>
+      </div>
+
+      {% if messages %}
+      <div class="mb-6 space-y-2">
+        {% for message in messages %}
+        <div class="rounded-xl px-4 py-3 text-sm
+          {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200
+          {% else %}bg-brand-50 text-green-800 border border-brand-200{% endif %}">
+          {{ message }}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <form method="POST" action="{% url 'accounts:register' %}" class="space-y-4">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="first_name" class="block text-sm font-medium text-gray-700 mb-1.5">Nombre</label>
+            <input type="text" id="first_name" name="first_name" required placeholder="Juan"
+                   class="w-full border border-gray-200 rounded-2xl px-4 py-3.5 text-base placeholder-gray-400
+                          focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+          </div>
+          <div>
+            <label for="last_name" class="block text-sm font-medium text-gray-700 mb-1.5">Apellido</label>
+            <input type="text" id="last_name" name="last_name" required placeholder="García"
+                   class="w-full border border-gray-200 rounded-2xl px-4 py-3.5 text-base placeholder-gray-400
+                          focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+          </div>
+        </div>
+
+        <div>
+          <label for="email" class="block text-sm font-medium text-gray-700 mb-1.5">Correo electrónico</label>
+          <input type="email" id="email" name="email" required placeholder="correo@ejemplo.com"
+                 class="w-full border border-gray-200 rounded-2xl px-4 py-3.5 text-base placeholder-gray-400
+                        focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+        </div>
+
+        <div>
+          <label for="username" class="block text-sm font-medium text-gray-700 mb-1.5">Nombre de usuario</label>
+          <input type="text" id="username" name="username" required placeholder="juangarcia"
+                 class="w-full border border-gray-200 rounded-2xl px-4 py-3.5 text-base placeholder-gray-400
+                        focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+        </div>
+
+        <div>
+          <label for="password1" class="block text-sm font-medium text-gray-700 mb-1.5">Contraseña</label>
+          <input type="password" id="password1" name="password1" required placeholder="Mínimo 8 caracteres"
+                 class="w-full border border-gray-200 rounded-2xl px-4 py-3.5 text-base placeholder-gray-400
+                        focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+        </div>
+
+        <div>
+          <label for="password2" class="block text-sm font-medium text-gray-700 mb-1.5">Confirma contraseña</label>
+          <input type="password" id="password2" name="password2" required placeholder="Repite tu contraseña"
+                 class="w-full border border-gray-200 rounded-2xl px-4 py-3.5 text-base placeholder-gray-400
+                        focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+        </div>
+
+        <p class="text-xs text-gray-400 mt-1">
+          Al registrarte aceptas nuestros
+          <a href="#" class="underline hover:text-gray-700">Términos de uso</a> y
+          <a href="#" class="underline hover:text-gray-700">Política de privacidad</a>.
+        </p>
+
+        <button type="submit"
+                class="w-full bg-brand-300 text-gray-900 font-bold text-base py-4 rounded-full
+                       hover:bg-brand-400 active:bg-brand-500 transition-colors mt-2">
+          Crear cuenta
+        </button>
+      </form>
+
+    </div>
+  </main>
+</div>
+{% endblock %}

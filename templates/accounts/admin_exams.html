@@ -1,0 +1,71 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Exámenes – Admin{% endblock %}
+{% block topbar %}
+<div class="flex items-center justify-between w-full">
+  <div>
+    <h1 class="text-lg font-bold text-gray-900">Exámenes</h1>
+    <p class="text-sm text-gray-400">{{ total_all }} examen{{ total_all|pluralize:"es" }} · {{ active_count }} activo{{ active_count|pluralize:"s" }}</p>
+  </div>
+  <a href="{% url 'accounts:admin_exam_new' %}"
+     class="bg-gray-900 text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-gray-700 transition-colors">
+    + Nuevo examen
+  </a>
+</div>
+{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <!-- Buscador -->
+  <form method="get" class="flex gap-3 max-w-sm">
+    <input type="text" name="q" value="{{ q }}" placeholder="Buscar…"
+           class="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300">
+    <button class="bg-gray-900 text-white text-sm px-4 py-2.5 rounded-xl">Buscar</button>
+  </form>
+
+  <!-- Tabla -->
+  <div class="bg-white rounded-3xl border border-gray-100 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-100">
+        <tr>
+          <th class="text-left px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Examen</th>
+          <th class="text-left px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Curso</th>
+          <th class="text-center px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Preguntas</th>
+          <th class="text-center px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Nota mín.</th>
+          <th class="text-center px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Estado</th>
+          <th class="px-6 py-4"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for exam in page_obj %}
+        <tr class="hover:bg-gray-50 transition-colors">
+          <td class="px-6 py-4 font-semibold text-gray-900">{{ exam.title }}</td>
+          <td class="px-6 py-4 text-gray-600">{{ exam.course.title }}</td>
+          <td class="px-6 py-4 text-center text-gray-600">{{ exam.questions.count }}</td>
+          <td class="px-6 py-4 text-center font-semibold text-gray-900">{{ exam.passing_score }}%</td>
+          <td class="px-6 py-4 text-center">
+            {% if exam.is_active %}
+            <span class="bg-brand-50 text-brand-700 text-xs font-semibold px-2.5 py-1 rounded-full">Activo</span>
+            {% else %}
+            <span class="bg-gray-100 text-gray-500 text-xs font-semibold px-2.5 py-1 rounded-full">Inactivo</span>
+            {% endif %}
+          </td>
+          <td class="px-6 py-4 text-right">
+            <a href="{% url 'accounts:admin_exam_edit' exam.pk %}"
+               class="text-xs font-semibold text-brand-600 hover:text-brand-800">Editar</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="px-6 py-12 text-center text-gray-400">No hay exámenes.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+  <div class="flex gap-2 justify-center text-sm">
+    {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}&q={{ q }}" class="px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50">←</a>{% endif %}
+    <span class="px-4 py-2 font-semibold">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}&q={{ q }}" class="px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50">→</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

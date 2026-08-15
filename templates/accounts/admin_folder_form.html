@@ -1,0 +1,64 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{% if editing %}Editar carpeta{% else %}Nueva carpeta{% endif %}{% endblock %}
+{% block topbar %}
+<div class="flex items-center gap-4">
+  <a href="{% url 'accounts:admin_biblioteca' %}" class="text-gray-400 hover:text-gray-700">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+    </svg>
+  </a>
+  <h1 class="text-lg font-bold text-gray-900">{% if editing %}Editar carpeta{% else %}Nueva carpeta{% endif %}</h1>
+</div>
+{% endblock %}
+{% block content %}
+<form method="post" class="max-w-lg">
+  {% csrf_token %}
+  <div class="bg-white rounded-3xl border border-gray-100 p-6 space-y-4">
+    <div>
+      <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Nombre</label>
+      <input type="text" name="name" value="{{ target.name|default:'' }}" required
+             class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300">
+    </div>
+    <div>
+      <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Carpeta padre <span class="font-normal text-gray-300">(raíz si vacío)</span></label>
+      <div class="relative">
+        <select name="parent_id" class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm appearance-none bg-white focus:outline-none focus:ring-2 focus:ring-brand-300">
+          <option value="">— Raíz —</option>
+          {% for f in folders_all %}
+          {% if not editing or f.pk != target.pk %}
+          <option value="{{ f.pk }}"
+            {% if parent and parent.pk == f.pk %}selected
+            {% elif editing and target.parent_id == f.pk %}selected{% endif %}>
+            {{ f.name }}
+          </option>
+          {% endif %}
+          {% endfor %}
+        </select>
+        <svg class="w-4 h-4 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </div>
+    </div>
+    <div>
+      <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Orden</label>
+      <input type="number" name="order" value="{{ target.order|default:0 }}" min="0"
+             class="w-32 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300">
+    </div>
+    <div class="flex items-center justify-between pt-2">
+      <div class="flex gap-3">
+        <button type="submit" class="bg-gray-900 text-white font-semibold px-6 py-3 rounded-full hover:bg-gray-700 transition-colors">
+          {% if editing %}Guardar{% else %}Crear carpeta{% endif %}
+        </button>
+        <a href="{% url 'accounts:admin_biblioteca' %}" class="text-sm text-gray-500 hover:text-gray-900 px-4 py-3">Cancelar</a>
+      </div>
+      {% if editing %}
+      <button type="submit" name="action" value="delete"
+              onclick="return confirm('¿Eliminar esta carpeta y todo su contenido?')"
+              class="text-sm font-semibold text-red-500 hover:text-red-700 px-4 py-3">
+        Eliminar
+      </button>
+      {% endif %}
+    </div>
+  </div>
+</form>
+{% endblock %}

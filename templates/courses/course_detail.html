@@ -1,0 +1,780 @@
+{% extends "base.html" %}
+
+{% block title %}{{ course.title }} – Nooxial{% endblock %}
+
+{% block body %}
+
+<!-- ─── NAVBAR ───────────────────────────────────────────────── -->
+<header class="sticky top-0 z-50 bg-white border-b border-gray-100">
+  <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-2">
+      <span class="text-2xl font-black text-gray-900 tracking-tight">
+        <span class="text-brand-400">N</span>ooxial
+      </span>
+    </a>
+    <div class="flex items-center gap-3">
+      {% if user.is_authenticated %}
+      <span class="hidden sm:block text-sm text-gray-600">{{ user.first_name|default:user.username }}</span>
+      <a href="{% url 'courses:dashboard' %}"
+         class="bg-gray-900 text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-gray-700 transition-colors">
+        Dashboard
+      </a>
+      {% else %}
+      <a href="{% url 'accounts:login' %}"
+         class="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors px-4 py-2">
+        Inicia sesión
+      </a>
+      <a href="{% url 'accounts:register' %}"
+         class="bg-gray-900 text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-gray-700 transition-colors">
+        Regístrate
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+<!-- ─── HERO ──────────────────────────────────────────────────── -->
+<section class="bg-gray-900 text-white px-6 py-14">
+  <div class="max-w-6xl mx-auto flex flex-col lg:flex-row gap-10 items-start">
+
+    <!-- Info izquierda -->
+    <div class="flex-1">
+      <a href="{% url 'courses:course_list' %}"
+         class="inline-flex items-center gap-1 text-gray-400 hover:text-white text-sm mb-5 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Todos los cursos
+      </a>
+      <div class="flex flex-wrap gap-2 mb-3">
+        {% for cat in course.categories.all %}
+        <span class="text-xs font-semibold bg-brand-300 text-gray-900 px-3 py-1 rounded-full">{{ cat.name }}</span>
+        {% endfor %}
+      </div>
+      <h1 class="text-3xl md:text-4xl font-black leading-tight">{{ course.title }}</h1>
+      <p class="mt-4 text-gray-300 text-base leading-relaxed max-w-2xl">{{ course.description }}</p>
+      <div class="mt-5 flex flex-wrap gap-6 text-sm text-gray-400">
+        <span>👤 {{ course.instructor.get_full_name|default:course.instructor.username }}</span>
+        <span>📊 {{ course.get_level_display }}</span>
+        <span>📚 {{ topics|length }} temas</span>
+        {% if course.price == 0 %}
+        <span class="text-brand-300 font-bold text-base">Gratis</span>
+        {% else %}
+        <span class="text-white font-bold text-xl">${{ course.price }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- CTA card derecha -->
+    <div class="lg:w-80 w-full flex-shrink-0 bg-white rounded-3xl p-6 text-gray-900 shadow-xl">
+      {% if course.featured_image %}
+      <img src="{{ course.featured_image.url }}" alt="{{ course.title }}"
+           class="w-full h-44 object-cover rounded-2xl mb-5">
+      {% else %}
+      <div class="w-full h-44 bg-brand-100 rounded-2xl mb-5 flex items-center justify-center text-6xl">
+        {{ course.emoji|default:"📚" }}
+      </div>
+      {% endif %}
+
+      {% if enrollment %}
+        <div class="mb-3 flex items-center gap-2">
+          <div class="flex-1 bg-gray-100 rounded-full h-2">
+            <div class="bg-brand-400 rounded-full h-2" style="width: {{ enrollment.progress }}%"></div>
+          </div>
+          <span class="text-xs font-semibold text-gray-600">{{ enrollment.progress }}%</span>
+        </div>
+        <p class="text-sm text-center text-brand-600 font-semibold mb-3">✅ Inscrito</p>
+        <a href="#contenido"
+           class="block text-center bg-gray-900 text-white font-semibold py-3 rounded-full hover:bg-gray-700 transition-colors">
+          Continuar aprendiendo
+        </a>
+      {% else %}
+        {% if user.is_authenticated %}
+        <form method="post" action="{% url 'courses:enroll' course.slug %}">
+          {% csrf_token %}
+          <button type="submit"
+                  class="w-full bg-brand-300 text-gray-900 font-bold py-3.5 rounded-full hover:bg-brand-400 transition-colors text-base">
+            {% if course.price == 0 %}Inscribirme gratis{% else %}Inscribirme – ${{ course.price }}{% endif %}
+          </button>
+        </form>
+        {% else %}
+        <a href="{% url 'accounts:login' %}?next={{ request.path }}"
+           class="block text-center bg-brand-300 text-gray-900 font-bold py-3.5 rounded-full hover:bg-brand-400 transition-colors text-base">
+          Inicia sesión para inscribirte
+        </a>
+        {% endif %}
+        <p class="text-xs text-center text-gray-400 mt-3">
+          🔒 Inscríbete para acceder al contenido completo
+        </p>
+      {% endif %}
+    </div>
+
+  </div>
+</section>
+
+<!-- ─── CONTENIDO DEL CURSO ───────────────────────────────────── -->
+<section id="contenido" class="py-14 px-6 bg-gray-50">
+  <div class="max-w-4xl mx-auto">
+
+    <!-- Tareas pendientes -->
+    {% if enrollment and pending_tasks %}
+    <div class="mb-8 bg-amber-50 border-2 border-amber-300 rounded-3xl p-5">
+      <div class="flex items-center gap-2 mb-4">
+        <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
+        <p class="font-bold text-amber-800">Tareas pendientes <span class="font-normal text-amber-600">({{ pending_tasks|length }})</span></p>
+      </div>
+      <div class="space-y-0 divide-y divide-amber-100">
+        {% for task in pending_tasks %}
+        <div class="flex items-center gap-3 py-3">
+          <span class="w-7 h-7 rounded-full border-2 border-amber-400 bg-amber-100 flex items-center justify-center flex-shrink-0">
+            <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/>
+            </svg>
+          </span>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-amber-900">{{ task.title }}</p>
+            <p class="text-xs text-amber-600 mt-0.5">
+              {{ task.lesson.title }}{% if task.requires_attachment %} · 📎 Requiere adjunto{% endif %}
+            </p>
+          </div>
+          <form method="post"
+                action="{% url 'courses:submit_task' course.slug task.id %}"
+                enctype="multipart/form-data"
+                class="flex-shrink-0">
+            {% csrf_token %}
+            {% if task.requires_attachment %}
+            <label class="cursor-pointer inline-flex items-center gap-1.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-full transition-colors">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+              </svg>
+              Subir archivo
+              <input type="file" name="attachment" class="hidden"
+                     onchange="this.closest('form').submit()">
+            </label>
+            {% else %}
+            <button type="submit"
+                    class="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-full transition-colors">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+              </svg>
+              Completar
+            </button>
+            {% endif %}
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h2 class="text-2xl font-bold text-gray-900">Contenido del curso</h2>
+        <p class="text-sm text-gray-500 mt-1">
+          {{ topics|length }} tema{{ topics|length|pluralize:"s" }}
+          {% if not enrollment %} · <span class="text-brand-600 font-medium">Inscríbete para ver el contenido</span>{% endif %}
+        </p>
+      </div>
+    </div>
+
+    {% if topics %}
+    <div class="space-y-3">
+      {% for topic in topics %}
+      <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+
+        <!-- Cabecera del tema -->
+        <button onclick="toggleTopic('topic-{{ forloop.counter }}')"
+                class="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors text-left">
+          <div class="flex items-center gap-3">
+            <span class="w-7 h-7 rounded-full bg-brand-100 text-brand-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+              {{ forloop.counter }}
+            </span>
+            <span class="font-semibold text-gray-900">{{ topic.name }}</span>
+            <span class="hidden sm:inline text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+              {{ topic.lessons.count }} clase{{ topic.lessons.count|pluralize:"s" }}
+            </span>
+          </div>
+          <svg id="icon-topic-{{ forloop.counter }}" class="w-5 h-5 text-gray-400 transition-transform flex-shrink-0"
+               fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+
+        <!-- Clases -->
+        <div id="topic-{{ forloop.counter }}" class="{% if forloop.first %}block{% else %}hidden{% endif %} border-t border-gray-100">
+          {% for lesson in topic.lessons.all %}
+
+          {% if enrollment %}
+          <!-- Inscrito: lección con check en cabecera + contenido expandible -->
+          <div class="border-b border-gray-50 last:border-0" id="lesson-{{ lesson.id }}">
+            <div class="flex items-center gap-3 px-5 py-3 hover:bg-brand-50 transition-colors group">
+
+              <!-- Icono tipo (play si tiene vídeo, doc si es texto) -->
+              {% if lesson.video %}
+              <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              {% else %}
+              <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+              {% endif %}
+
+              <!-- Título (click expande contenido) -->
+              <button onclick="toggleLesson('content-{{ lesson.id }}')"
+                      class="flex-1 text-left min-w-0">
+                <span class="text-sm font-medium {% if lesson.id in completed_ids %}text-gray-400 line-through{% else %}text-gray-900{% endif %}">
+                  {{ lesson.title }}
+                </span>
+              </button>
+
+              <!-- Flecha expandir -->
+              <button onclick="toggleLesson('content-{{ lesson.id }}')" class="p-1 flex-shrink-0">
+                <svg id="icon-content-{{ lesson.id }}"
+                     class="w-4 h-4 text-gray-300 transition-transform"
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+
+              <!-- CHECK: marcar/desmarcar (siempre visible a la derecha) -->
+              <form method="post" action="{% url 'courses:toggle_lesson' course.slug lesson.id %}"
+                    class="flex-shrink-0">
+                {% csrf_token %}
+                {% if lesson.id in completed_ids %}
+                <button type="submit" title="Desmarcar clase"
+                        class="flex items-center gap-1.5 bg-brand-400 text-white text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-red-400 transition-colors">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                  </svg>
+                  Completada
+                </button>
+                {% else %}
+                <button type="submit" title="Marcar como completada"
+                        class="flex items-center gap-1.5 bg-amber-100 text-amber-700 border border-amber-300 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-brand-300 hover:text-gray-900 hover:border-brand-400 transition-colors">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                  </svg>
+                  Completar
+                </button>
+                {% endif %}
+              </form>
+            </div>
+
+            <!-- Contenido expandido -->
+            <div id="content-{{ lesson.id }}" class="hidden bg-gray-50 px-5 pb-5 pt-2">
+              {% if lesson.video %}
+              <div class="rounded-2xl overflow-hidden bg-black mb-3 w-full" style="aspect-ratio:16/9">
+                <video id="video-{{ lesson.id }}" controls class="w-full h-full" preload="metadata"
+                       data-lesson-id="{{ lesson.id }}"
+                       data-toggle-url="{% url 'courses:toggle_lesson' course.slug lesson.id %}"
+                       data-done="{% if lesson.id in completed_ids %}1{% else %}0{% endif %}">
+                  <source src="{{ lesson.video.url }}">
+                  Tu navegador no soporta la reproducción de vídeo.
+                </video>
+              </div>
+              <p id="watching-hint-{{ lesson.id }}" class="text-xs text-gray-400 mb-3">
+                {% if lesson.id in completed_ids %}✅ Clase completada{% else %}El vídeo se marcará automáticamente al terminar{% endif %}
+              </p>
+              {% endif %}
+
+              {% if lesson.content %}
+              <div class="text-sm text-gray-700 leading-relaxed mb-3 whitespace-pre-line">{{ lesson.content }}</div>
+              {% endif %}
+
+              {% if lesson.attachments.all %}
+              <div class="mb-3">
+                <p class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Archivos adjuntos</p>
+                <ul class="space-y-1">
+                  {% for att in lesson.attachments.all %}
+                  <li>
+                    <a href="{{ att.file.url }}" target="_blank" download
+                       class="inline-flex items-center gap-2 text-sm text-brand-600 hover:text-brand-800 font-medium">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                      </svg>
+                      {{ att.name|default:att.file.name }}
+                    </a>
+                  </li>
+                  {% endfor %}
+                </ul>
+              </div>
+              {% endif %}
+
+              {% if not lesson.video and not lesson.content and not lesson.attachments.all %}
+              <p class="text-sm text-gray-400 italic">Contenido próximamente.</p>
+              {% endif %}
+
+              <!-- ─── TAREAS DE LA CLASE ───────────────────────── -->
+              {% if lesson.tasks.all %}
+              <div class="mt-5 border-t border-gray-200 pt-4 space-y-3">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Tareas</p>
+                {% for task in lesson.tasks.all %}
+                {% if task.is_active %}
+                <div id="task-{{ task.id }}" class="bg-white border border-gray-200 rounded-2xl p-4">
+                  <div class="flex items-start gap-3">
+                    <div class="flex-shrink-0 mt-0.5">
+                      {% if task.id in submitted_tasks %}
+                      <span class="w-6 h-6 rounded-full bg-brand-400 flex items-center justify-center">
+                        <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                        </svg>
+                      </span>
+                      {% else %}
+                      <span class="w-6 h-6 rounded-full border-2 border-amber-300 bg-amber-50 flex items-center justify-center">
+                        <svg class="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                      </span>
+                      {% endif %}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-semibold {% if task.id in submitted_tasks %}text-gray-400 line-through{% else %}text-gray-900{% endif %}">
+                        {{ task.title }}
+                      </p>
+                      {% if task.description %}
+                      <p class="text-xs text-gray-500 mt-0.5">{{ task.description }}</p>
+                      {% endif %}
+                      {% if task.requires_attachment %}
+                      <p class="text-xs text-blue-600 font-medium mt-1">📎 Requiere adjunto</p>
+                      {% endif %}
+                    </div>
+                    <!-- Botón entregar/marcar -->
+                    <form method="post"
+                          action="{% url 'courses:submit_task' course.slug task.id %}"
+                          enctype="multipart/form-data"
+                          class="flex-shrink-0 flex items-center gap-2">
+                      {% csrf_token %}
+                      {% if task.requires_attachment and not task.id in submitted_tasks %}
+                      <label class="cursor-pointer text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                        </svg>
+                        Subir
+                        <input type="file" name="attachment" class="hidden"
+                               onchange="this.closest('form').submit()">
+                      </label>
+                      {% else %}
+                      {% if task.id in submitted_tasks %}
+                      <button type="submit"
+                              class="text-xs font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full transition-colors">
+                        Desmarcar
+                      </button>
+                      {% else %}
+                      <button type="submit"
+                              class="text-xs font-semibold text-white bg-amber-500 hover:bg-amber-600 px-3 py-1.5 rounded-full transition-colors flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Completar
+                      </button>
+                      {% endif %}
+                      {% endif %}
+                    </form>
+                  </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+              </div>
+              {% endif %}
+
+              <!-- ─── COMENTARIOS ──────────────────────────────── -->
+              <div class="mt-5 pt-4 border-t border-gray-200">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+                  Comentarios ({{ lesson.comments.count }})
+                </p>
+
+                <!-- Lista de comentarios -->
+                {% for comment in lesson.comments.all %}
+                {% if not comment.parent %}
+                <div class="mb-4">
+                  <!-- Comentario principal -->
+                  <div class="flex gap-3">
+                    <!-- Avatar comentario -->
+                    {% if comment.author.profile.photo %}
+                    <img src="{{ comment.author.profile.photo.url }}" alt=""
+                         class="w-8 h-8 rounded-full object-cover flex-shrink-0">
+                    {% else %}
+                    <div class="w-8 h-8 rounded-full bg-brand-300 flex items-center justify-center text-xs font-black text-gray-900 flex-shrink-0">
+                      {{ comment.author.first_name|first|upper }}{{ comment.author.last_name|first|upper }}
+                    </div>
+                    {% endif %}
+                    <div class="flex-1">
+                      <div class="bg-gray-100 rounded-2xl px-4 py-3">
+                        <p class="text-xs font-semibold text-gray-900 mb-1">
+                          {{ comment.author.get_full_name|default:comment.author.username }}
+                          {% if comment.author == course.instructor %}
+                          <span class="text-xs text-brand-600 font-bold ml-1">· Instructor</span>
+                          {% endif %}
+                        </p>
+                        <p class="text-sm text-gray-700">{{ comment.content }}</p>
+                      </div>
+                      <p class="text-xs text-gray-400 mt-1 pl-2">{{ comment.created_at|date:"d/m/Y H:i" }}</p>
+
+                      <!-- Respuestas -->
+                      {% for reply in comment.replies.all %}
+                      <div class="flex gap-3 mt-2 pl-4">
+                      <!-- Avatar respuesta -->
+                      {% if reply.author.profile.photo %}
+                      <img src="{{ reply.author.profile.photo.url }}" alt=""
+                           class="w-7 h-7 rounded-full object-cover flex-shrink-0">
+                      {% else %}
+                      <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0
+                        {% if reply.author == course.instructor %}bg-gray-900 text-brand-300{% else %}bg-brand-300 text-gray-900{% endif %}">
+                        {{ reply.author.first_name|first|upper }}{{ reply.author.last_name|first|upper }}
+                      </div>
+                      {% endif %}
+                        <div class="flex-1">
+                          <div class="{% if reply.author == course.instructor %}bg-gray-900 text-white{% else %}bg-gray-100{% endif %} rounded-2xl px-4 py-3">
+                            <p class="text-xs font-semibold mb-1 {% if reply.author == course.instructor %}text-brand-300{% else %}text-gray-900{% endif %}">
+                              {{ reply.author.get_full_name|default:reply.author.username }}
+                              {% if reply.author == course.instructor %}<span class="ml-1">· Instructor</span>{% endif %}
+                            </p>
+                            <p class="text-sm {% if reply.author == course.instructor %}text-gray-200{% else %}text-gray-700{% endif %}">{{ reply.content }}</p>
+                          </div>
+                          <p class="text-xs text-gray-400 mt-1 pl-2">{{ reply.created_at|date:"d/m/Y H:i" }}</p>
+                        </div>
+                      </div>
+                      {% endfor %}
+
+                      <!-- Form respuesta (solo instructor) -->
+                      {% if request.user == course.instructor %}
+                      <form method="post" action="{% url 'courses:add_comment' course.slug lesson.id %}"
+                            class="mt-2 pl-4 flex gap-2">
+                        {% csrf_token %}
+                        <input type="hidden" name="parent_id" value="{{ comment.pk }}">
+                        <input type="text" name="content" placeholder="Responder como instructor…" required
+                               class="flex-1 border border-gray-200 rounded-full px-4 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300">
+                        <button type="submit"
+                                class="bg-gray-900 text-white text-xs font-semibold px-4 py-1.5 rounded-full hover:bg-gray-700 transition-colors">
+                          Responder
+                        </button>
+                      </form>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+                {% endif %}
+                {% empty %}
+                <p class="text-sm text-gray-400 italic mb-3">Sé el primero en comentar.</p>
+                {% endfor %}
+
+                <!-- Form nuevo comentario -->
+                <form method="post" action="{% url 'courses:add_comment' course.slug lesson.id %}"
+                      class="flex gap-2 mt-3">
+                  {% csrf_token %}
+                  {% if request.user.profile.photo %}
+                  <img src="{{ request.user.profile.photo.url }}" alt=""
+                       class="w-8 h-8 rounded-full object-cover flex-shrink-0">
+                  {% else %}
+                  <div class="w-8 h-8 rounded-full bg-brand-300 flex items-center justify-center text-xs font-black text-gray-900 flex-shrink-0">
+                    {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
+                  </div>
+                  {% endif %}
+                  <input type="text" name="content" placeholder="Escribe un comentario…" required
+                         class="flex-1 border border-gray-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300">
+                  <button type="submit"
+                          class="bg-gray-900 text-white text-xs font-semibold px-4 py-2 rounded-full hover:bg-gray-700 transition-colors flex-shrink-0">
+                    Enviar
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          {% else %}
+          <!-- No inscrito: solo título con candado -->
+          <div class="flex items-center gap-3 px-6 py-3 border-b border-gray-50 last:border-0">
+            <svg class="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+            <span class="text-sm text-gray-400">{{ lesson.title }}</span>
+          </div>
+          {% endif %}
+
+          {% empty %}
+          <p class="px-6 py-4 text-sm text-gray-400 italic">Sin clases en este tema.</p>
+          {% endfor %}
+        </div>
+
+      </div>
+      {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="text-center py-14 text-gray-400">
+      <p class="text-4xl mb-3">📋</p>
+      <p class="font-medium">El temario estará disponible pronto.</p>
+    </div>
+    {% endif %}
+
+    <!-- Banner inscripción para no inscritos -->
+    {% if not enrollment %}
+    <div class="mt-10 bg-gray-900 text-white rounded-3xl p-8 text-center">
+      <p class="text-2xl font-black mb-2">🔒 Accede a todo el contenido</p>
+      <p class="text-gray-400 mb-6">Inscríbete para ver los vídeos, textos y archivos de cada clase.</p>
+      {% if user.is_authenticated %}
+      <form method="post" action="{% url 'courses:enroll' course.slug %}">
+        {% csrf_token %}
+        <button type="submit"
+                class="bg-brand-300 text-gray-900 font-bold px-8 py-3.5 rounded-full hover:bg-brand-400 transition-colors text-base">
+          {% if course.price == 0 %}Inscribirme gratis{% else %}Inscribirme – ${{ course.price }}{% endif %}
+        </button>
+      </form>
+      {% else %}
+      <a href="{% url 'accounts:login' %}?next={{ request.path }}"
+         class="inline-block bg-brand-300 text-gray-900 font-bold px-8 py-3.5 rounded-full hover:bg-brand-400 transition-colors text-base">
+        Inicia sesión para inscribirte
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Sección examen (solo si está inscrito y el curso tiene examen) -->
+    {% if exam %}
+    {% if all_completed %}    <div class="mt-10 bg-gray-900 text-white rounded-3xl p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+      <div>
+        <p class="text-xs font-bold text-brand-300 uppercase tracking-widest mb-1">Examen final</p>
+        <h3 class="text-xl font-black">{{ exam.title }}</h3>
+        <p class="text-gray-400 text-sm mt-1">
+          {{ exam.questions.count }} pregunta{{ exam.questions.count|pluralize:"s" }} &middot;
+          Mínimo {{ exam.passing_score }}% para aprobar &middot; Intentos ilimitados
+        </p>
+      </div>
+      <div class="flex flex-col gap-2 flex-shrink-0">
+        {% if passed_exam %}
+        <a href="{% url 'courses:certificate' course.slug %}"
+           class="inline-flex items-center gap-2 bg-brand-300 text-gray-900 font-bold px-6 py-3 rounded-full hover:bg-brand-400 transition-colors whitespace-nowrap text-center">
+          🏆 Descargar certificado
+        </a>
+        <a href="{% url 'courses:take_exam' course.slug %}"
+           class="inline-flex items-center justify-center gap-2 bg-white/10 text-white text-sm font-semibold px-6 py-2.5 rounded-full hover:bg-white/20 transition-colors whitespace-nowrap">
+          Repetir examen
+        </a>
+        {% else %}
+        <a href="{% url 'courses:take_exam' course.slug %}"
+           class="flex-shrink-0 bg-brand-300 text-gray-900 font-bold px-7 py-3.5 rounded-full hover:bg-brand-400 transition-colors whitespace-nowrap">
+          Hacer el examen
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="mt-10 bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl p-8 flex flex-col sm:flex-row items-center gap-6">
+      <div class="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 text-2xl">🔒</div>
+      <div>
+        <p class="font-bold text-gray-900">Completa todas las clases para acceder al examen</p>
+        <p class="text-sm text-gray-500 mt-1">
+          Marca todas las clases como completadas y desbloquearás el examen final <strong>{{ exam.title }}</strong>.
+        </p>
+      </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+  </div>
+</section>
+
+<!-- ─── VALORACIONES ─────────────────────────────────────────── -->
+<section id="valoraciones" class="py-14 px-6 border-t border-gray-100">
+  <div class="max-w-4xl mx-auto">
+
+    <!-- Cabecera con media -->
+    <div class="flex items-center gap-6 mb-8">
+      <div class="text-center">
+        <p class="text-5xl font-black text-gray-900">{{ avg_rating|floatformat:1|default:"—" }}</p>
+        <div class="flex gap-0.5 justify-center mt-1">
+          {% for i in "12345" %}
+          <svg class="w-5 h-5 {% if avg_rating and forloop.counter <= avg_rating %}text-yellow-400{% else %}text-gray-200{% endif %} fill-current"
+               viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          {% endfor %}
+        </div>
+        <p class="text-xs text-gray-400 mt-1">{{ reviews|length }} valoracion{{ reviews|length|pluralize:"es" }}</p>
+      </div>
+      <div class="flex-1">
+        <h2 class="text-2xl font-bold text-gray-900">Valoraciones del curso</h2>
+        <p class="text-sm text-gray-500 mt-1">Opiniones de los estudiantes inscritos</p>
+      </div>
+    </div>
+
+    <!-- Formulario (solo inscritos, una valoración por usuario) -->
+    {% if enrollment %}
+    <div class="bg-white rounded-3xl border border-gray-100 p-6 mb-8">
+      <h3 class="font-bold text-gray-900 mb-4">
+        {% if user_review %}Editar mi valoración{% else %}Deja tu valoración{% endif %}
+      </h3>
+      <form method="post" action="{% url 'courses:review_course' course.slug %}">
+        {% csrf_token %}
+        <!-- Estrellas interactivas -->
+        <div class="flex gap-2 mb-4" id="star-picker">
+          {% for i in "12345" %}
+          <label class="cursor-pointer">
+            <input type="radio" name="rating" value="{{ forloop.counter }}" class="sr-only"
+                   {% if user_review and user_review.rating == forloop.counter %}checked{% endif %}>
+            <svg class="w-9 h-9 transition-colors star-icon fill-current
+                        {% if user_review and forloop.counter <= user_review.rating %}text-yellow-400{% else %}text-gray-200{% endif %}"
+                 data-val="{{ forloop.counter }}" viewBox="0 0 20 20">
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+            </svg>
+          </label>
+          {% endfor %}
+        </div>
+        <textarea name="comment" rows="3" placeholder="Comparte tu experiencia con el curso (opcional)…"
+                  class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 resize-none mb-3">{{ user_review.comment|default:'' }}</textarea>
+        <button type="submit"
+                class="bg-gray-900 text-white text-sm font-semibold px-6 py-2.5 rounded-full hover:bg-gray-700 transition-colors">
+          {% if user_review %}Actualizar valoración{% else %}Enviar valoración{% endif %}
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
+    <!-- Lista de valoraciones -->
+    {% if reviews %}
+    <div class="space-y-4">
+      {% for review in reviews %}
+      <div class="bg-white rounded-2xl border border-gray-100 p-5">
+        <div class="flex items-start gap-4">
+          {% if review.student.profile.photo %}
+          <img src="{{ review.student.profile.photo.url }}" alt=""
+               class="w-10 h-10 rounded-full object-cover flex-shrink-0">
+          {% else %}
+          <div class="w-10 h-10 rounded-full bg-brand-300 flex items-center justify-center font-black text-sm text-gray-900 flex-shrink-0">
+            {{ review.student.first_name|first|upper }}{{ review.student.last_name|first|upper }}
+          </div>
+          {% endif %}
+          <div class="flex-1">
+            <div class="flex items-center gap-3 mb-1">
+              <p class="font-semibold text-gray-900 text-sm">
+                {{ review.student.get_full_name|default:review.student.username }}
+              </p>
+              <div class="flex gap-0.5">
+                {% for i in "12345" %}
+                <svg class="w-4 h-4 {% if forloop.counter <= review.rating %}text-yellow-400{% else %}text-gray-200{% endif %} fill-current"
+                     viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                {% endfor %}
+              </div>
+              <span class="text-xs text-gray-400">{{ review.created_at|date:"d/m/Y" }}</span>
+            </div>
+            {% if review.comment %}
+            <p class="text-sm text-gray-700">{{ review.comment }}</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-400 text-center py-8">Aún no hay valoraciones. ¡Sé el primero!</p>
+    {% endif %}
+
+  </div>
+</section>
+
+<script>
+// Estrellas interactivas
+document.querySelectorAll('#star-picker label').forEach(label => {
+  label.addEventListener('mouseenter', function() {
+    const val = this.querySelector('svg').dataset.val;
+    document.querySelectorAll('.star-icon').forEach(s => {
+      s.classList.toggle('text-yellow-400', parseInt(s.dataset.val) <= parseInt(val));
+      s.classList.toggle('text-gray-200', parseInt(s.dataset.val) > parseInt(val));
+    });
+  });
+});
+document.getElementById('star-picker')?.addEventListener('mouseleave', function() {
+  const checked = this.querySelector('input:checked');
+  const val = checked ? parseInt(checked.value) : 0;
+  document.querySelectorAll('.star-icon').forEach(s => {
+    s.classList.toggle('text-yellow-400', parseInt(s.dataset.val) <= val);
+    s.classList.toggle('text-gray-200', parseInt(s.dataset.val) > val);
+  });
+});
+document.querySelectorAll('#star-picker input').forEach(input => {
+  input.addEventListener('change', function() {
+    const val = parseInt(this.value);
+    document.querySelectorAll('.star-icon').forEach(s => {
+      s.classList.toggle('text-yellow-400', parseInt(s.dataset.val) <= val);
+      s.classList.toggle('text-gray-200', parseInt(s.dataset.val) > val);
+    });
+  });
+});
+</script>
+
+<script>
+function toggleTopic(id) {
+  const el = document.getElementById(id);
+  const icon = document.getElementById('icon-' + id);
+  el.classList.toggle('hidden');
+  icon.classList.toggle('rotate-180');
+}
+function toggleLesson(id) {
+  const el = document.getElementById(id);
+  const icon = document.getElementById('icon-' + id);
+  el.classList.toggle('hidden');
+  icon.classList.toggle('rotate-180');
+}
+
+// Auto-marcar al terminar el vídeo (o al pulsar play si ya estaba marcado no hace nada)
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('video[data-lesson-id]').forEach(function (video) {
+    const lessonId  = video.dataset.lessonId;
+    const toggleUrl = video.dataset.toggleUrl;
+    const isDone    = video.dataset.done === '1';
+    const hint      = document.getElementById('watching-hint-' + lessonId);
+    const btn       = document.getElementById('mark-btn-'     + lessonId);
+
+    if (isDone) return; // ya marcada, nada que hacer
+
+    // Al pulsar play: cambiar el hint
+    video.addEventListener('play', function () {
+      if (hint) hint.textContent = 'Viendo...';
+    });
+
+    // Al terminar: marcar automáticamente via fetch
+    video.addEventListener('ended', function () {
+      const form = document.getElementById('toggle-form-' + lessonId);
+      if (!form) return;
+      const csrfToken = form.querySelector('[name=csrfmiddlewaretoken]').value;
+      fetch(toggleUrl, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'csrfmiddlewaretoken=' + encodeURIComponent(csrfToken),
+        redirect: 'manual',
+      }).then(function () {
+        // Actualizar UI sin recargar
+        if (btn) {
+          btn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Vista';
+          btn.className = btn.className.replace('bg-brand-500 hover:bg-brand-600', 'bg-brand-100 text-brand-700');
+        }
+        if (hint) hint.textContent = '\u2705 Completada';
+        // Actualizar icono en el botón colapsable
+        const rowIcon = document.querySelector('#lesson-' + lessonId + ' .rounded-full.bg-brand-400');
+        if (!rowIcon) {
+          const playIcon = document.querySelector('#lesson-' + lessonId + ' svg.text-brand-400');
+          if (playIcon) {
+            const span = document.createElement('span');
+            span.className = 'w-5 h-5 rounded-full bg-brand-400 flex items-center justify-center flex-shrink-0';
+            span.innerHTML = '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>';
+            playIcon.replaceWith(span);
+          }
+        }
+      }).catch(function () {
+        // Si falla el fetch, al menos mostrar el botón
+      });
+    });
+  });
+});
+</script>
+
+{% endblock %}

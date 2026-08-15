@@ -1,0 +1,75 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Tareas – Admin{% endblock %}
+{% block topbar %}
+<div class="flex items-center justify-between w-full">
+  <div>
+    <h1 class="text-lg font-bold text-gray-900">Tareas</h1>
+    <p class="text-sm text-gray-400">{{ total_all }} tarea{{ total_all|pluralize:"s" }}</p>
+  </div>
+  <a href="{% url 'accounts:admin_task_new' %}"
+     class="bg-gray-900 text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-gray-700 transition-colors">
+    + Nueva tarea
+  </a>
+</div>
+{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <form method="get" class="flex gap-3 max-w-sm">
+    <input type="text" name="q" value="{{ q }}" placeholder="Buscar…"
+           class="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300">
+    <button class="bg-gray-900 text-white text-sm px-4 py-2.5 rounded-xl">Buscar</button>
+  </form>
+
+  <div class="bg-white rounded-3xl border border-gray-100 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-100">
+        <tr>
+          <th class="text-left px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Tarea</th>
+          <th class="text-left px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Clase</th>
+          <th class="text-left px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Curso</th>
+          <th class="text-center px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Adjunto</th>
+          <th class="text-center px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Entregas</th>
+          <th class="text-center px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Estado</th>
+          <th class="px-6 py-4"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for task in page_obj %}
+        <tr class="hover:bg-gray-50 transition-colors">
+          <td class="px-6 py-4 font-semibold text-gray-900">{{ task.title }}</td>
+          <td class="px-6 py-4 text-gray-600">{{ task.lesson.title }}</td>
+          <td class="px-6 py-4 text-gray-500 text-xs">{{ task.lesson.course.title }}</td>
+          <td class="px-6 py-4 text-center">
+            {% if task.requires_attachment %}
+            <span class="text-xs bg-blue-50 text-blue-600 font-semibold px-2 py-0.5 rounded-full">📎 Sí</span>
+            {% else %}
+            <span class="text-xs text-gray-300">—</span>
+            {% endif %}
+          </td>
+          <td class="px-6 py-4 text-center">
+            <a href="{% url 'accounts:admin_task_submissions' task.pk %}"
+               class="inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full transition-colors
+                      {% if task.submissions_count %}bg-brand-50 text-brand-700 hover:bg-brand-100{% else %}text-gray-400 bg-gray-50{% endif %}">
+              {{ task.submissions_count }} entrega{{ task.submissions_count|pluralize:"s" }}
+            </a>
+          </td>
+          <td class="px-6 py-4 text-center">
+            {% if task.is_active %}
+            <span class="bg-brand-50 text-brand-700 text-xs font-semibold px-2.5 py-1 rounded-full">Activa</span>
+            {% else %}
+            <span class="bg-gray-100 text-gray-500 text-xs font-semibold px-2.5 py-1 rounded-full">Inactiva</span>
+            {% endif %}
+          </td>
+          <td class="px-6 py-4 text-right">
+            <a href="{% url 'accounts:admin_task_edit' task.pk %}"
+               class="text-xs font-semibold text-brand-600 hover:text-brand-800">Editar</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="px-6 py-12 text-center text-gray-400">No hay tareas.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

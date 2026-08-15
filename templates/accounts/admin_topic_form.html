@@ -1,0 +1,190 @@
+{% extends "dashboard_base.html" %}
+
+{% block title %}{% if editing %}{{ target.name }}{% else %}Nuevo tema{% endif %} – Nooxial{% endblock %}
+
+{% block topbar %}
+<nav class="flex items-center gap-1.5 text-sm text-gray-400">
+  <a href="{% url 'courses:dashboard' %}" class="hover:text-gray-700">Inicio</a>
+  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <a href="{% url 'accounts:admin_topics' %}" class="hover:text-gray-700">Temas</a>
+  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <span class="text-gray-900 font-semibold">
+    {% if editing %}{{ target.name }}{% else %}Nuevo tema{% endif %}
+  </span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<form method="POST">
+{% csrf_token %}
+
+<div class="bg-white rounded-2xl border border-gray-100 max-w-2xl">
+
+  <!-- ── ACTION BAR ─────────────────────────────────────────── -->
+  <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+    <div class="flex items-center gap-3">
+      <a href="{% url 'accounts:admin_topics' %}"
+         class="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+      </a>
+      <div>
+        <h1 class="text-lg font-bold text-gray-900">
+          {% if editing %}{{ target.name }}{% else %}Nuevo tema{% endif %}
+        </h1>
+        {% if editing %}
+        <p class="text-xs text-gray-400 mt-0.5">
+          ID #{{ target.pk }}
+          {% if target.course %} · {{ target.course.title }}{% endif %}
+          · Creado el {{ target.created_at|date:"d M Y" }}
+        </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+      {% if editing %}
+      <span class="text-xs font-semibold px-3 py-1.5 rounded-full mr-2
+        {% if target.is_active %}bg-brand-50 text-brand-700{% else %}bg-gray-100 text-gray-500{% endif %}">
+        {% if target.is_active %}● Activo{% else %}● Inactivo{% endif %}
+      </span>
+      {% endif %}
+
+      <a href="{% url 'accounts:admin_topics' %}"
+         class="text-sm font-semibold text-gray-500 border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-50 transition-colors">
+        Descartar
+      </a>
+      <button type="submit" name="action" value="save"
+              class="flex items-center gap-2 text-sm font-bold bg-brand-300 text-gray-900 px-4 py-2 rounded-xl hover:bg-brand-400 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+        </svg>
+        Guardar
+      </button>
+      {% if editing %}
+      <button type="submit" name="action" value="delete"
+              onclick="return confirm('¿Eliminar el tema «{{ target.name }}»? Esta acción no se puede deshacer.')"
+              class="flex items-center gap-2 text-sm font-semibold text-red-600 border border-red-200 px-4 py-2 rounded-xl hover:bg-red-50 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+        </svg>
+        Eliminar
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Messages -->
+  {% if messages %}
+  <div class="px-6 py-3 border-b border-gray-100 space-y-2">
+    {% for message in messages %}
+    <div class="flex items-center gap-2 text-sm rounded-xl px-4 py-2.5
+      {% if message.tags == 'error' %}bg-red-50 text-red-700{% else %}bg-brand-50 text-green-800{% endif %}">
+      {% if message.tags == 'error' %}
+      <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      {% else %}
+      <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+      </svg>
+      {% endif %}
+      {{ message }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- ── FORM FIELDS ────────────────────────────────────────── -->
+  <div class="p-6 space-y-5">
+
+    <!-- Nombre -->
+    <div>
+      <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+        Nombre <span class="text-red-400">*</span>
+      </label>
+      <input type="text" name="name" value="{{ target.name|default:'' }}"
+             placeholder="Ej: Comunicación efectiva"
+             required autofocus
+             class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900
+                    focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+    </div>
+
+    <!-- Descripción -->
+    <div>
+      <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+        Descripción <span class="text-gray-300 font-normal">(opcional)</span>
+      </label>
+      <textarea name="description" rows="3"
+                placeholder="Describe brevemente el contenido de este tema…"
+                class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 resize-none
+                       focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition">{{ target.description|default:'' }}</textarea>
+    </div>
+
+    <!-- Curso -->
+    <div>
+      <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+        Curso <span class="text-gray-300 font-normal">(opcional)</span>
+      </label>
+      <div class="relative">
+        <select name="course"
+                class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 appearance-none bg-white
+                       focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition">
+          <option value="">— Sin curso asignado —</option>
+          {% for c in courses %}
+          <option value="{{ c.pk }}" {% if target.course_id == c.pk %}selected{% endif %}>
+            {{ c.title }}
+          </option>
+          {% endfor %}
+        </select>
+        <svg class="w-4 h-4 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
+             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </div>
+      {% if not courses %}
+      <p class="text-xs text-gray-400 mt-1.5">
+        No hay cursos creados aún.
+        <a href="{% url 'accounts:admin_course_new' %}" class="text-brand-600 underline">Crear un curso</a>
+      </p>
+      {% endif %}
+    </div>
+
+    <!-- Activo toggle -->
+    <div class="flex items-center justify-between py-3 border-t border-gray-100">
+      <div>
+        <p class="text-sm font-semibold text-gray-800">Tema activo</p>
+        <p class="text-xs text-gray-400 mt-0.5">Visible en el contenido del curso</p>
+      </div>
+      <div class="relative">
+        <input type="checkbox" name="is_active" id="tog-active"
+               {% if target.is_active or not editing %}checked{% endif %}
+               class="sr-only peer" />
+        <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-brand-400 transition-colors cursor-pointer"
+             onclick="document.getElementById('tog-active').click()"></div>
+        <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5 pointer-events-none"></div>
+      </div>
+    </div>
+
+    {% if editing %}
+    <div class="pt-1 space-y-2 text-sm text-gray-400">
+      <div class="flex justify-between">
+        <span>Última actualización</span>
+        <span class="text-gray-600 font-medium">{{ target.updated_at|date:"d M Y, H:i" }}</span>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+</form>
+
+<style>
+  input:checked ~ div > div { transform: translateX(1.25rem); }
+</style>
+{% endblock %}
