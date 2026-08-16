@@ -576,21 +576,7 @@ document.addEventListener('click', function(e) {
   var seenGroupMsgIds = JSON.parse(localStorage.getItem('nooxial_seen_groups') || '{}');
 
   // ── Sonido de notificación ────────────────────────────────────
-  function playNotifSound() {
-    try {
-      var ctx = new (window.AudioContext || window.webkitAudioContext)();
-      var osc  = ctx.createOscillator();
-      var gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.12);
-      gain.gain.setValueAtTime(0.25, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.35);
-    } catch(e) {}
-  }
+  function playNotifSound() { /* deshabilitado */ }
 
   var URLS = {
     conversations: '{% url "accounts:dm_conversations" %}',

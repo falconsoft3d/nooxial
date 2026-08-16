@@ -193,12 +193,13 @@ def profile_view(request):
 
         elif form_type == 'cv':
             profile.cv_headline   = request.POST.get('cv_headline', '').strip()
+            profile.cv_phone      = request.POST.get('cv_phone', '').strip()
             profile.cv_summary    = request.POST.get('cv_summary', '').strip()
             profile.cv_experience = request.POST.get('cv_experience', '').strip()
             profile.cv_education  = request.POST.get('cv_education', '').strip()
             profile.cv_skills     = request.POST.get('cv_skills', '').strip()
             profile.cv_public     = request.POST.get('cv_public') == '1'
-            profile.save(update_fields=['cv_headline','cv_summary','cv_experience',
+            profile.save(update_fields=['cv_headline','cv_phone','cv_summary','cv_experience',
                                         'cv_education','cv_skills','cv_public'])
             messages.success(request, 'Currículum actualizado.')
 
@@ -2331,6 +2332,7 @@ def plan_register_view(request, token, company_id=None):
     })
 
 def public_cv(request, username):
+    from courses.models import Course, Enrollment
     target_user = get_object_or_404(User, username=username, is_active=True)
     try:
         profile = target_user.profile
@@ -2340,9 +2342,23 @@ def public_cv(request, username):
     if not profile.cv_public or not (profile.cv_headline or profile.cv_summary or profile.cv_experience or profile.cv_education or profile.cv_skills):
         from django.http import Http404
         raise Http404
+
+    # Cursos como profesor
+    courses_taught = Course.objects.filter(
+        instructor=target_user, is_published=True
+    ).order_by('-created_at')
+
+    # Cursos como estudiante
+    enrollments = Enrollment.objects.filter(
+        student=target_user
+    ).select_related('course').order_by('-enrolled_at') if not courses_taught.exists() else []
+
     return render(request, 'accounts/public_cv.html', {
-        'target_user': target_user,
-        'profile':     profile,
+        'target_user':    target_user,
+        'profile':        profile,
+        'courses_taught': courses_taught,
+        'enrollments':    enrollments,
+        'is_teacher':     courses_taught.exists(),
     })
 
 

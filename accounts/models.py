@@ -48,6 +48,7 @@ class UserProfile(models.Model):
         max_length=128, blank=True, verbose_name='PIN de bloqueo (hash)'
     )
     cv_headline    = models.CharField(max_length=200, blank=True, verbose_name='Titular profesional')
+    cv_phone       = models.CharField(max_length=30, blank=True, verbose_name='Teléfono de contacto')
     cv_summary     = models.TextField(blank=True, verbose_name='Resumen profesional')
     cv_experience  = models.TextField(blank=True, verbose_name='Experiencia laboral')
     cv_education   = models.TextField(blank=True, verbose_name='Formación académica')

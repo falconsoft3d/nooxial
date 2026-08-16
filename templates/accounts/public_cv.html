@@ -24,6 +24,26 @@
           {% if profile.company %}
           <p class="text-sm text-gray-500 mt-0.5">{{ profile.company.name }}</p>
           {% endif %}
+          <div class="flex flex-wrap gap-4 mt-2">
+            {% if target_user.email %}
+            <a href="mailto:{{ target_user.email }}" class="flex items-center gap-1.5 text-sm text-gray-500 hover:text-brand-600 transition-colors">
+              <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+              {{ target_user.email }}
+            </a>
+            {% endif %}
+            {% if profile.cv_phone %}
+            <a href="tel:{{ profile.cv_phone }}" class="flex items-center gap-1.5 text-sm text-gray-500 hover:text-brand-600 transition-colors">
+              <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+              </svg>
+              {{ profile.cv_phone }}
+            </a>
+            {% endif %}
+          </div>
         </div>
       </div>
     </div>
@@ -68,6 +88,65 @@
     {% endif %}
 
     <p class="text-center text-xs text-gray-300 pb-4">Currículum publicado en Nooxial</p>
+
+    <!-- Cursos como profesor -->
+    {% if is_teacher and courses_taught %}
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <h2 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Cursos impartidos</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {% for course in courses_taught %}
+        <a href="{% url 'courses:course_detail' course.slug %}"
+           class="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group border border-gray-100">
+          {% if course.featured_image %}
+          <img src="{{ course.featured_image.url }}" alt="{{ course.title }}"
+               class="w-16 h-12 object-cover rounded-lg flex-shrink-0">
+          {% else %}
+          <div class="w-16 h-12 bg-brand-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <svg class="w-6 h-6 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+            </svg>
+          </div>
+          {% endif %}
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold text-gray-900 group-hover:text-brand-700 transition-colors line-clamp-2">{{ course.title }}</p>
+            <p class="text-xs text-gray-400 mt-0.5 capitalize">{{ course.get_level_display }}</p>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Cursos como estudiante -->
+    {% if not is_teacher and enrollments %}
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <h2 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Cursos realizados</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {% for enrollment in enrollments %}
+        <a href="{% url 'courses:course_detail' enrollment.course.slug %}"
+           class="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group border border-gray-100">
+          {% if enrollment.course.featured_image %}
+          <img src="{{ enrollment.course.featured_image.url }}" alt="{{ enrollment.course.title }}"
+               class="w-16 h-12 object-cover rounded-lg flex-shrink-0">
+          {% else %}
+          <div class="w-16 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+            </svg>
+          </div>
+          {% endif %}
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold text-gray-900 group-hover:text-brand-700 transition-colors line-clamp-2">{{ enrollment.course.title }}</p>
+            <p class="text-xs text-gray-400 mt-0.5 capitalize">{{ enrollment.course.get_level_display }}</p>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
   </div>
 </div>
 {% endblock %}
