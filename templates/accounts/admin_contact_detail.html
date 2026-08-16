@@ -1,0 +1,94 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ contact.full_name }} – Contactos – Nooxial{% endblock %}
+
+{% block topbar %}
+<nav class="flex items-center gap-1.5 text-sm text-gray-400">
+  <a href="{% url 'courses:dashboard' %}" class="hover:text-gray-700">Inicio</a>
+  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <a href="{% url 'accounts:admin_contacts' %}" class="hover:text-gray-700">Contactos</a>
+  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <span class="text-gray-900 font-semibold">{{ contact.full_name }}</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+
+  <div class="bg-white rounded-2xl border border-gray-100">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <div class="flex items-center gap-4">
+        <a href="{% url 'accounts:admin_contacts' %}"
+           class="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+          </svg>
+        </a>
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center text-lg font-bold text-brand-700">
+            {{ contact.first_name|first|upper }}
+          </div>
+          <div>
+            <h1 class="text-lg font-bold text-gray-900">{{ contact.full_name }}</h1>
+            <p class="text-xs text-gray-400">Recibido el {{ contact.created_at|date:"d M Y, H:i" }}</p>
+          </div>
+        </div>
+      </div>
+      <form method="POST">
+        {% csrf_token %}
+        <button type="submit" name="action" value="delete"
+                onclick="return confirm('¿Eliminar este contacto?')"
+                class="flex items-center gap-2 text-sm font-semibold text-red-600 border border-red-200 px-4 py-2 rounded-xl hover:bg-red-50 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+          Eliminar
+        </button>
+      </form>
+    </div>
+
+    <!-- Body -->
+    <div class="p-6 grid grid-cols-2 gap-5 text-sm">
+
+      <div>
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Email</p>
+        <a href="mailto:{{ contact.email }}" class="text-brand-600 hover:underline">{{ contact.email }}</a>
+      </div>
+
+      {% if contact.phone %}
+      <div>
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Teléfono</p>
+        <a href="tel:{{ contact.phone }}" class="text-gray-800">{{ contact.phone }}</a>
+      </div>
+      {% endif %}
+
+      {% if contact.company %}
+      <div>
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Empresa</p>
+        <p class="text-gray-800 font-medium">{{ contact.company }}</p>
+      </div>
+      {% endif %}
+
+      {% if contact.position %}
+      <div>
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Cargo</p>
+        <p class="text-gray-800">{{ contact.position }}</p>
+      </div>
+      {% endif %}
+
+      {% if contact.message %}
+      <div class="col-span-2">
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Mensaje</p>
+        <div class="bg-gray-50 rounded-2xl px-5 py-4 text-gray-700 leading-relaxed whitespace-pre-wrap">{{ contact.message }}</div>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endblock %}

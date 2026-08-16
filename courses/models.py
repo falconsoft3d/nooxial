@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils.text import slugify
@@ -55,6 +56,10 @@ class Course(models.Model):
     )
     is_featured  = models.BooleanField(default=False, verbose_name='Curso destacado')
     is_published = models.BooleanField(default=False, verbose_name='Publicado')
+    # Acceso demo
+    demo_url      = models.URLField(blank=True, verbose_name='URL de acceso demo')
+    demo_login    = models.CharField(max_length=255, blank=True, verbose_name='Usuario demo')
+    demo_password = models.CharField(max_length=255, blank=True, verbose_name='Contraseña demo')
     created_at  = models.DateTimeField(auto_now_add=True)
     updated_at  = models.DateTimeField(auto_now=True)
 
@@ -96,11 +101,13 @@ class Enrollment(models.Model):
 
 
 class TrainingPlan(models.Model):
-    name        = models.CharField(max_length=200, verbose_name='Nombre')
-    description = models.TextField(blank=True, verbose_name='Descripción')
-    is_active   = models.BooleanField(default=True, verbose_name='Activo')
-    created_at  = models.DateTimeField(auto_now_add=True)
-    updated_at  = models.DateTimeField(auto_now=True)
+    name           = models.CharField(max_length=200, verbose_name='Nombre')
+    description    = models.TextField(blank=True, verbose_name='Descripción')
+    is_active      = models.BooleanField(default=True, verbose_name='Activo')
+    register_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False,
+                                      verbose_name='Token de registro')
+    created_at     = models.DateTimeField(auto_now_add=True)
+    updated_at     = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name        = 'Plan de capacitación'
@@ -506,3 +513,118 @@ class ArticleComment(models.Model):
 
     def __str__(self):
         return f'{self.author.username}: {self.content[:50]}'
+
+# ─── PROFESORES: VALORACIONES Y MENSAJES ─────────────────
+
+class TeacherRating(models.Model):
+    teacher    = models.ForeignKey(User, on_delete=models.CASCADE,
+                                   related_name='teacher_ratings', verbose_name='Profesor')
+    student    = models.ForeignKey(User, on_delete=models.CASCADE,
+                                   related_name='given_teacher_ratings', verbose_name='Estudiante')
+    rating     = models.PositiveSmallIntegerField(
+        default=5, verbose_name='Valoración',
+        choices=[(1,'1 estrella'),(2,'2 estrellas'),(3,'3 estrellas'),(4,'4 estrellas'),(5,'5 estrellas')]
+    )
+    comment    = models.TextField(blank=True, verbose_name='Comentario público')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = 'Valoración de profesor'
+        verbose_name_plural = 'Valoraciones de profesores'
+        unique_together     = ('teacher', 'student')
+        ordering            = ['-created_at']
+
+    def __str__(self):
+        return f'{self.student.username} -> {self.teacher.username}: {self.rating}*'
+
+
+class TeacherMessage(models.Model):
+    teacher    = models.ForeignKey(User, on_delete=models.CASCADE,
+                                   related_name='teacher_inbox', verbose_name='Profesor')
+    student    = models.ForeignKey(User, on_delete=models.CASCADE,
+                                   related_name='student_outbox', verbose_name='Estudiante')
+    sender     = models.ForeignKey(User, on_delete=models.CASCADE,
+                                   related_name='sent_teacher_msgs', verbose_name='Remitente')
+    content    = models.TextField(verbose_name='Mensaje')
+    is_read    = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = 'Mensaje a profesor'
+        verbose_name_plural = 'Mensajes a profesores'
+        ordering            = ['created_at']
+
+    def __str__(self):
+        return f'{self.sender.username}: {self.content[:40]}'
+
+
+# ─── MIS DOCUMENTOS ──────────────────────────────────────────────
+
+class UserFolder(models.Model):
+    user       = models.ForeignKey(User, on_delete=models.CASCADE, related_name='my_folders')
+    name       = models.CharField(max_length=200, verbose_name='Nombre')
+    parent     = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True,
+                                   related_name='children')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = 'Carpeta personal'
+        verbose_name_plural = 'Carpetas personales'
+        ordering            = ['name']
+        unique_together     = ('user', 'parent', 'name')
+
+    def __str__(self):
+        return self.name
+
+    def breadcrumb(self):
+        crumbs = []
+        node = self
+        while node:
+            crumbs.insert(0, node)
+            node = node.parent
+        return crumbs
+
+
+class UserFile(models.Model):
+    folder     = models.ForeignKey(UserFolder, on_delete=models.CASCADE, related_name='files')
+    user       = models.ForeignKey(User, on_delete=models.CASCADE, related_name='my_files')
+    name       = models.CharField(max_length=255, verbose_name='Nombre')
+    file       = models.FileField(upload_to='user_docs/', verbose_name='Archivo')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = 'Archivo personal'
+        verbose_name_plural = 'Archivos personales'
+        ordering            = ['name']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def extension(self):
+        import os
+        return os.path.splitext(self.name)[1].lower().lstrip('.')
+
+
+class UserNote(models.Model):
+    folder       = models.ForeignKey(UserFolder, on_delete=models.CASCADE, related_name='notes')
+    user         = models.ForeignKey(User, on_delete=models.CASCADE, related_name='my_notes')
+    title        = models.CharField(max_length=255, verbose_name='Título')
+    content      = models.TextField(blank=True, verbose_name='Contenido')
+    share_token  = models.UUIDField(null=True, blank=True, unique=True, verbose_name='Token de compartir')
+    created_at   = models.DateTimeField(auto_now_add=True)
+    updated_at   = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = 'Nota personal'
+        verbose_name_plural = 'Notas personales'
+        ordering            = ['-updated_at']
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def is_shared(self):
+        return self.share_token is not None

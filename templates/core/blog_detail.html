@@ -2,26 +2,6 @@
 {% block title %}{{ article.title }} – Blog Nooxial{% endblock %}
 {% block body %}
 
-<!-- Navbar -->
-<header class="sticky top-0 z-50 bg-white border-b border-gray-100">
-  <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-    <a href="/" class="text-2xl font-black text-gray-900"><span class="text-brand-400">N</span>ooxial</a>
-    <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
-      <a href="/" class="hover:text-gray-900">Inicio</a>
-      <a href="/dashboard/cursos/" class="hover:text-gray-900">Cursos</a>
-      <a href="/blog/" class="font-semibold text-gray-900">Blog</a>
-    </nav>
-    <div class="flex items-center gap-3">
-      {% if user.is_authenticated %}
-      <a href="{% url 'courses:dashboard' %}" class="bg-gray-900 text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-gray-700 transition-colors">Dashboard</a>
-      {% else %}
-      <a href="{% url 'accounts:login' %}" class="text-sm font-medium text-gray-700 hover:text-gray-900 px-4 py-2">Inicia sesión</a>
-      <a href="{% url 'accounts:register' %}" class="bg-gray-900 text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-gray-700 transition-colors">Regístrate</a>
-      {% endif %}
-    </div>
-  </div>
-</header>
-
 <!-- Artículo -->
 <article class="max-w-3xl mx-auto px-6 py-14">
 

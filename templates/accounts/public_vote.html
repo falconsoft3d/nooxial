@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Votar – {{ voting.name }}{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-gray-900 flex flex-col">
+
+  <header class="bg-white border-b border-gray-100">
+    <div class="max-w-2xl mx-auto px-6 h-14 flex items-center justify-between">
+      <a href="/" class="text-xl font-black tracking-tight text-gray-900">
+        <span class="text-brand-400">N</span>ooxial
+      </a>
+      <a href="{% url 'accounts:public_vote_results' voting.public_token %}"
+         class="text-xs font-semibold text-gray-500 hover:text-gray-900 transition-colors">
+        Ver resultados →
+      </a>
+    </div>
+  </header>
+
+  <main class="flex-1 flex items-start justify-center pt-10 pb-16 px-4">
+    <div class="w-full max-w-md">
+
+      <div class="text-center mb-8">
+        <div class="w-14 h-14 bg-brand-400 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <svg class="w-7 h-7 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+        <h1 class="text-2xl font-black text-white">{{ voting.name }}</h1>
+        {% if voting.description %}<p class="text-gray-400 mt-2 text-sm">{{ voting.description }}</p>{% endif %}
+        <p class="text-xs text-gray-500 mt-2">{{ voting.total_votes }} voto{{ voting.total_votes|pluralize:"s" }} emitido{{ voting.total_votes|pluralize:"s" }}</p>
+      </div>
+
+      {% if not voting.is_open %}
+      <div class="bg-white rounded-3xl p-8 text-center">
+        <p class="text-3xl mb-3">🔒</p>
+        <p class="font-bold text-gray-900">Esta votación está cerrada</p>
+        <a href="{% url 'accounts:public_vote_results' voting.public_token %}"
+           class="mt-4 inline-block bg-gray-900 text-white font-bold px-6 py-3 rounded-full hover:bg-gray-700 transition-colors text-sm">
+          Ver resultados finales
+        </a>
+      </div>
+
+      {% elif already_voted %}
+      <div class="bg-white rounded-3xl p-8 text-center">
+        <div class="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+          </svg>
+        </div>
+        <h2 class="text-xl font-black text-gray-900 mb-1">¡Ya has votado!</h2>
+        <p class="text-gray-500 text-sm">Tu voto ha sido registrado. Puedes seguir los resultados en tiempo real.</p>
+        <a href="{% url 'accounts:public_vote_results' voting.public_token %}"
+           class="mt-5 inline-block bg-gray-900 text-white font-bold px-8 py-3 rounded-full hover:bg-gray-700 transition-colors text-sm">
+          Ver resultados en vivo
+        </a>
+      </div>
+
+      {% else %}
+      <div class="bg-white rounded-3xl p-8">
+
+        {% if error %}
+        <div class="mb-5 px-4 py-3 rounded-xl text-sm text-red-700 bg-red-50 border border-red-200">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" class="space-y-5">
+          {% csrf_token %}
+
+          <!-- Opciones -->
+          <div class="space-y-3">
+            {% for opt in voting.options.all %}
+            <label class="flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 cursor-pointer
+                          hover:border-brand-300 hover:bg-brand-50 transition-colors has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50">
+              <input type="radio" name="option" value="{{ opt.pk }}" required
+                     class="w-5 h-5 accent-[#9fe870] flex-shrink-0">
+              <span class="font-semibold text-gray-900">{{ opt.name }}</span>
+            </label>
+            {% endfor %}
+          </div>
+
+          <!-- Datos del votante (solo si no está logueado) -->
+          {% if not user.is_authenticated %}
+          <div class="border-t border-gray-100 pt-5 space-y-3">
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Tus datos</p>
+            <input type="text" name="voter_name" required placeholder="Nombre completo *"
+                   class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+            <div class="grid grid-cols-2 gap-3">
+              <input type="email" name="voter_email" placeholder="Email"
+                     class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+              <input type="tel" name="voter_phone" placeholder="Teléfono"
+                     class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+            </div>
+          </div>
+          {% else %}
+          <p class="text-xs text-gray-400 text-center pt-1">
+            Votando como <strong class="text-gray-700">{{ user.get_full_name|default:user.username }}</strong>
+          </p>
+          {% endif %}
+
+          <button type="submit"
+                  class="w-full bg-gray-900 text-white font-black py-4 rounded-full
+                         hover:bg-gray-700 active:bg-gray-800 transition-colors">
+            Emitir mi voto
+          </button>
+        </form>
+      </div>
+      {% endif %}
+
+    </div>
+  </main>
+</div>
+{% endblock %}

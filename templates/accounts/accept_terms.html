@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Términos y Condiciones – Nooxial{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-gray-50 flex flex-col">
+
+  <header class="bg-white border-b border-gray-100">
+    <div class="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
+      <a href="/" class="text-xl font-black tracking-tight text-gray-900">
+        <span class="text-brand-400">N</span>ooxial
+      </a>
+      <span class="text-xs text-gray-400">
+        Bienvenido/a, <strong class="text-gray-700">{{ request.user.get_full_name|default:request.user.username }}</strong>
+      </span>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
+
+    <div class="text-center mb-8">
+      <div class="w-14 h-14 bg-brand-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <svg class="w-7 h-7 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+      </div>
+      <h1 class="text-2xl font-black text-gray-900">{{ terms.title }}</h1>
+      {% if terms.version %}
+      <p class="text-sm text-gray-400 mt-1">Versión {{ terms.version }} · {{ terms.created_at|date:"d M Y" }}</p>
+      {% else %}
+      <p class="text-sm text-gray-400 mt-1">{{ terms.created_at|date:"d M Y" }}</p>
+      {% endif %}
+      <p class="text-sm text-gray-500 mt-2">Para continuar usando la plataforma debes leer y aceptar los siguientes términos.</p>
+    </div>
+
+    <!-- Contenido de los T&C -->
+    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-8 mb-6 max-h-96 overflow-y-auto">
+      <pre class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap font-sans">{{ terms.description }}</pre>
+    </div>
+
+    <!-- Acciones -->
+    <div class="bg-white rounded-3xl border border-gray-100 p-6">
+      <form method="POST">
+        {% csrf_token %}
+        <div class="flex items-start gap-3 mb-5">
+          <input type="checkbox" id="confirm-read" required
+                 class="w-5 h-5 rounded accent-[#9fe870] mt-0.5 cursor-pointer flex-shrink-0">
+          <label for="confirm-read" class="text-sm text-gray-700 cursor-pointer leading-relaxed">
+            He leído y comprendido los <strong>Términos y Condiciones</strong> en su totalidad y acepto quedar vinculado/a por ellos.
+          </label>
+        </div>
+        <div class="flex gap-3">
+          <button type="submit" name="accept" value="yes"
+                  class="flex-1 bg-gray-900 text-white font-black py-4 rounded-full hover:bg-gray-700 transition-colors">
+            Acepto los términos y condiciones
+          </button>
+          <button type="submit" name="accept" value="no"
+                  onclick="return confirm('Si no aceptas los términos, se cerrará tu sesión. ¿Continuar?')"
+                  class="border border-gray-200 text-gray-500 font-semibold px-6 py-4 rounded-full hover:bg-gray-50 transition-colors text-sm">
+            No acepto
+          </button>
+        </div>
+        <p class="text-xs text-center text-gray-400 mt-3">
+          Si pulsas "No acepto" tu sesión se cerrará automáticamente.
+        </p>
+      </form>
+    </div>
+
+  </main>
+</div>
+{% endblock %}

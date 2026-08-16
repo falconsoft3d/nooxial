@@ -1,0 +1,209 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{% if editing %}{{ target.name }}{% else %}Nueva votación{% endif %} – Nooxial{% endblock %}
+
+{% block topbar %}
+<nav class="flex items-center gap-1.5 text-sm text-gray-400">
+  <a href="{% url 'accounts:admin_votings' %}" class="hover:text-gray-700">Votaciones</a>
+  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <span class="text-gray-900 font-semibold">{% if editing %}{{ target.name }}{% else %}Nueva votación{% endif %}</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+{% if messages %}
+<div class="mb-5 space-y-2">
+  {% for msg in messages %}
+  <div class="px-4 py-3 rounded-xl text-sm font-medium
+    {% if msg.tags == 'error' %}bg-red-50 text-red-700{% else %}bg-brand-50 text-brand-700{% endif %}">
+    {{ msg }}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<form method="POST">
+{% csrf_token %}
+
+<div class="bg-white rounded-2xl border border-gray-100 max-w-2xl">
+
+  <!-- Action bar -->
+  <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+    <div class="flex items-center gap-3">
+      <a href="{% url 'accounts:admin_votings' %}"
+         class="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+      </a>
+      <h1 class="text-lg font-bold text-gray-900">{% if editing %}{{ target.name }}{% else %}Nueva votación{% endif %}</h1>
+    </div>
+    <div class="flex items-center gap-2">
+      {% if editing %}
+      <a href="{% url 'accounts:public_vote_results' target.public_token %}" target="_blank"
+         class="text-xs font-bold text-brand-600 border border-brand-200 px-3 py-2 rounded-xl hover:bg-brand-50 transition-colors">
+        Ver dashboard →
+      </a>
+      <a href="{% url 'accounts:public_vote' target.public_token %}" target="_blank"
+         class="text-xs font-bold text-gray-600 border border-gray-200 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors">
+        Abrir votación →
+      </a>
+      {% endif %}
+      <button type="submit" name="action" value="save"
+              class="flex items-center gap-2 text-sm font-bold bg-brand-300 text-gray-900 px-4 py-2 rounded-xl hover:bg-brand-400 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+        </svg>
+        Guardar
+      </button>
+      {% if editing %}
+      <button type="submit" name="action" value="delete"
+              onclick="return confirm('¿Eliminar esta votación y todos sus votos?')"
+              class="flex items-center gap-2 text-sm font-semibold text-red-600 border border-red-200 px-4 py-2 rounded-xl hover:bg-red-50 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+        </svg>
+        Eliminar
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="p-6 space-y-5">
+
+    <div>
+      <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Nombre <span class="text-red-400">*</span></label>
+      <input type="text" name="name" value="{{ target.name|default:'' }}" required autofocus
+             placeholder="Ej: Elección de delegado de clase"
+             class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+    </div>
+
+    <div>
+      <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Descripción</label>
+      <textarea name="description" rows="2" placeholder="Descripción opcional…"
+                class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition">{{ target.description|default:'' }}</textarea>
+    </div>
+
+    <div>
+      <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Fecha de cierre <span class="text-gray-300 font-normal">(opcional)</span></label>
+      <input type="datetime-local" name="ends_at"
+             value="{% if target.ends_at %}{{ target.ends_at|date:'Y-m-d' }}T{{ target.ends_at|date:'H:i' }}{% endif %}"
+             class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+    </div>
+
+    <div class="flex items-center justify-between py-3 border-t border-gray-100">
+      <div>
+        <p class="text-sm font-semibold text-gray-800">Votación activa</p>
+        <p class="text-xs text-gray-400 mt-0.5">Los usuarios pueden votar cuando está activa</p>
+      </div>
+      <div class="relative">
+        <input type="checkbox" name="is_active" id="tog-active"
+               {% if target.is_active or not editing %}checked{% endif %} class="sr-only peer" />
+        <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-brand-400 transition-colors cursor-pointer"
+             onclick="document.getElementById('tog-active').click()"></div>
+        <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5 pointer-events-none"></div>
+      </div>
+    </div>
+
+    <!-- Opciones -->
+    <div class="border-t border-gray-100 pt-5">
+      <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+        Opciones <span class="text-red-400">*</span>
+        <span class="text-gray-300 font-normal normal-case ml-1">(mínimo 2)</span>
+      </label>
+      <div id="options-list" class="space-y-2">
+        {% if editing %}
+          {% for opt in target.options.all %}
+          <div class="flex items-center gap-2 option-row">
+            <div class="w-6 h-6 rounded-full bg-brand-100 flex items-center justify-center text-xs font-bold text-brand-700 flex-shrink-0">{{ forloop.counter }}</div>
+            <input type="text" name="option_name" value="{{ opt.name }}" required
+                   placeholder="Nombre de la opción"
+                   class="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+            <button type="button" onclick="removeOption(this)"
+                    class="p-1.5 text-gray-400 hover:text-red-500 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="flex items-center gap-2 option-row">
+            <div class="w-6 h-6 rounded-full bg-brand-100 flex items-center justify-center text-xs font-bold text-brand-700 flex-shrink-0 counter">1</div>
+            <input type="text" name="option_name" required placeholder="Ej: Juan García"
+                   class="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+            <button type="button" onclick="removeOption(this)" class="p-1.5 text-gray-400 hover:text-red-500 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div class="flex items-center gap-2 option-row">
+            <div class="w-6 h-6 rounded-full bg-brand-100 flex items-center justify-center text-xs font-bold text-brand-700 flex-shrink-0 counter">2</div>
+            <input type="text" name="option_name" required placeholder="Ej: María López"
+                   class="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+            <button type="button" onclick="removeOption(this)" class="p-1.5 text-gray-400 hover:text-red-500 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+        {% endif %}
+      </div>
+      <button type="button" onclick="addOption()"
+              class="mt-3 flex items-center gap-2 text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+        </svg>
+        Añadir opción
+      </button>
+    </div>
+
+    {% if editing %}
+    <!-- URL pública -->
+    <div class="border-t border-gray-100 pt-4">
+      <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">URL de votación</p>
+      <div class="flex items-center gap-2 bg-brand-50 border border-brand-200 rounded-xl px-4 py-3">
+        <span id="vote-url" class="text-xs text-brand-700 font-medium flex-1 truncate">
+          {{ request.scheme }}://{{ request.get_host }}{% url 'accounts:public_vote' target.public_token %}
+        </span>
+        <button type="button" onclick="copyVoteUrl(this)"
+                class="text-xs font-bold text-brand-700 hover:text-brand-900 flex-shrink-0 transition-colors">Copiar</button>
+        <a href="{% url 'accounts:public_vote' target.public_token %}" target="_blank"
+           class="text-xs font-bold text-brand-600 hover:text-brand-800 flex-shrink-0 transition-colors">Abrir →</a>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+</form>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function addOption() {
+  var list = document.getElementById('options-list');
+  var count = list.querySelectorAll('.option-row').length + 1;
+  var div = document.createElement('div');
+  div.className = 'flex items-center gap-2 option-row';
+  div.innerHTML = '<div class="w-6 h-6 rounded-full bg-brand-100 flex items-center justify-center text-xs font-bold text-brand-700 flex-shrink-0">' + count + '</div>' +
+    '<input type="text" name="option_name" required placeholder="Nombre de la opción" class="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />' +
+    '<button type="button" onclick="removeOption(this)" class="p-1.5 text-gray-400 hover:text-red-500 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>';
+  list.appendChild(div);
+  div.querySelector('input').focus();
+}
+function removeOption(btn) {
+  var list = document.getElementById('options-list');
+  if (list.querySelectorAll('.option-row').length <= 2) { alert('Debes tener al menos 2 opciones.'); return; }
+  btn.closest('.option-row').remove();
+  list.querySelectorAll('.option-row').forEach(function(r, i) {
+    var c = r.querySelector('.w-6');
+    if (c) c.textContent = i + 1;
+  });
+}
+function copyVoteUrl(btn) {
+  navigator.clipboard.writeText(document.getElementById('vote-url').textContent.trim()).then(function() {
+    var orig = btn.textContent; btn.textContent = '✓ Copiado';
+    setTimeout(function() { btn.textContent = orig; }, 1500);
+  });
+}
+</script>
+{% endblock %}

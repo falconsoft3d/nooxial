@@ -1,0 +1,75 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ student.get_full_name|default:student.username }} – Mensajes{% endblock %}
+
+{% block topbar %}
+<nav class="flex items-center gap-1.5 text-sm text-gray-400">
+  <a href="{% url 'courses:teacher_inbox' %}" class="hover:text-gray-700">Mensajes</a>
+  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <span class="text-gray-900 font-semibold">{{ student.get_full_name|default:student.username }}</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+  <div class="bg-white rounded-3xl border border-gray-100 flex flex-col" style="height: 560px;">
+
+    <div class="px-5 py-4 border-b border-gray-100 flex items-center gap-3 flex-shrink-0">
+      {% if student.profile.photo %}
+      <img src="{{ student.profile.photo.url }}" class="w-8 h-8 rounded-full object-cover">
+      {% else %}
+      <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600">
+        {{ student.first_name|first|upper }}{{ student.last_name|first|upper }}
+      </div>
+      {% endif %}
+      <div>
+        <p class="text-sm font-bold text-gray-900">{{ student.get_full_name|default:student.username }}</p>
+        <p class="text-xs text-gray-400">Estudiante</p>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-5 py-4 space-y-3" id="msg-container">
+      {% for msg in messages %}
+      <div class="flex {% if msg.sender == request.user %}justify-end{% else %}justify-start{% endif %}">
+        <div class="max-w-xs lg:max-w-sm {% if msg.sender == request.user %}bg-gray-900 text-white{% else %}bg-gray-100 text-gray-900{% endif %} rounded-2xl px-4 py-2.5">
+          <p class="text-sm leading-relaxed">{{ msg.content }}</p>
+          <p class="text-xs text-gray-400 mt-1">{{ msg.created_at|date:"d M, H:i" }}</p>
+        </div>
+      </div>
+      {% empty %}
+      <div class="flex items-center justify-center h-full text-center text-gray-400">
+        <div><p class="text-4xl mb-2">💬</p><p class="text-sm">Empieza la conversación</p></div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+      <form method="POST" action="{% url 'courses:teacher_send_message' request.user.pk %}"
+            class="flex gap-3 items-end">
+        {% csrf_token %}
+        <input type="hidden" name="student_id" value="{{ student.pk }}">
+        <textarea name="content" rows="2" placeholder="Responder al estudiante…"
+                  class="flex-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm resize-none
+                         focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition"
+                  onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.closest('form').submit();}"></textarea>
+        <button type="submit"
+                class="bg-gray-900 text-white p-3 rounded-2xl hover:bg-gray-700 transition-colors flex-shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+          </svg>
+        </button>
+      </form>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+var mc = document.getElementById('msg-container');
+if (mc) mc.scrollTop = mc.scrollHeight;
+</script>
+{% endblock %}

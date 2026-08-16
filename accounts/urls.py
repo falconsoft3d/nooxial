@@ -8,11 +8,33 @@ urlpatterns = [
     path('register/', views.register_view, name='register'),
     path('logout/',   views.logout_view,   name='logout'),
     path('profile/',  views.profile_view,  name='profile'),
+    # Bloqueo de pantalla
+    path('lock/',        views.lock_view,        name='lock'),
+    path('lock-screen/', views.lock_screen_view, name='lock_screen'),
+    path('change-pin/',  views.change_pin_view,  name='change_pin'),
+    path('unlock/',      views.lock_screen_view, name='unlock'),
+    # Chat directo
+    path('chat/api/conversations/',           views.dm_conversations,   name='dm_conversations'),
+    path('chat/api/thread/<int:user_id>/',    views.dm_thread,          name='dm_thread'),
+    path('chat/api/send/',                    views.dm_send,            name='dm_send'),
+    path('chat/api/users/',                   views.dm_user_search,     name='dm_user_search'),
     # Admin: gestión de usuarios
     path('panel/progreso/',               views.admin_progress,      name='admin_progress'),
     path('panel/usuarios/',               views.admin_users,         name='admin_users'),
     path('panel/usuarios/nuevo/',         views.admin_user_form,     name='admin_user_new'),
     path('panel/usuarios/<int:user_id>/', views.admin_user_form,     name='admin_user_edit'),
+    # Admin: empresas
+    path('panel/empresas/',                  views.admin_companies,    name='admin_companies'),
+    path('panel/empresas/nueva/',            views.admin_company_form, name='admin_company_new'),
+    path('panel/empresas/<int:company_id>/', views.admin_company_form, name='admin_company_edit'),
+    # Dashboard público de empresa (con token)
+    path('empresa/<uuid:token>/dashboard/',   views.company_dashboard,    name='company_dashboard'),
+    path('empresa/<uuid:token>/registro/',    views.company_register,     name='company_register'),
+    # Asistencia pública de empresa
+    path('empresa/<uuid:token>/asistencia/',  views.company_attendance,   name='company_attendance'),
+    # Admin: contactos
+    path('panel/contactos/',                    views.admin_contacts,      name='admin_contacts'),
+    path('panel/contactos/<int:contact_id>/',   views.admin_contact_view,  name='admin_contact_detail'),
     # Admin: categorías
     path('panel/categorias/',                     views.admin_categories,     name='admin_categories'),
     path('panel/categorias/nuevo/',               views.admin_category_form,  name='admin_category_new'),
@@ -62,5 +84,39 @@ urlpatterns = [
     path('panel/soporte/<int:ticket_id>/',           views.admin_support_thread, name='admin_support_thread'),
     path('panel/soporte/<int:ticket_id>/responder/', views.admin_support_reply,  name='admin_support_reply'),
     # Admin: configuración general
-    path('panel/config/', views.admin_config, name='admin_config'),
+    path('panel/config/',            views.admin_config,            name='admin_config'),
+    path('panel/config/test-email/', views.admin_config_test_email, name='admin_config_test_email'),
+    # Admin: términos y condiciones
+    path('panel/terminos/',                 views.admin_terms,      name='admin_terms'),
+    path('panel/terminos/nuevo/',           views.admin_terms_form, name='admin_terms_new'),
+    path('panel/terminos/<int:terms_id>/',  views.admin_terms_form, name='admin_terms_edit'),
+    # Reuniones por empresa (WebRTC)
+    path('reunion/',                            views.company_meeting,       name='meeting'),
+    path('reunion/empresa/<int:company_id>/',   views.company_meeting,       name='meeting_company'),
+    path('reunion/signal/',                     views.meeting_signal_post,   name='meeting_signal_post'),
+    path('reunion/signal/poll/',                views.meeting_signal_poll,   name='meeting_signal_poll'),
+    # Currículum público
+    path('curriculo/<str:username>/', views.public_cv, name='public_cv'),
+    # Aceptar T&C (usuarios)
+    path('aceptar-terminos/', views.accept_terms_view, name='accept_terms'),
+    # Registro por plan de capacitación (asocia empresa + plan)
+    path('registro/empresa/<int:company_id>/plan/<uuid:token>/', views.plan_register_view, name='plan_register'),
+    # Admin: grupos de chat
+    path('panel/grupos-chat/',                        views.admin_chat_groups,       name='admin_chat_groups'),
+    path('panel/grupos-chat/nuevo/',                  views.admin_chat_group_form,   name='admin_chat_group_new'),
+    path('panel/grupos-chat/<int:group_id>/',         views.admin_chat_group_form,   name='admin_chat_group_edit'),
+    # API: grupos de chat (usuario)
+    path('api/grupos/',                               views.user_groups_api,         name='user_groups_api'),
+    path('api/grupos/<int:group_id>/mensajes/',       views.group_messages_api,      name='group_messages_api'),
+    # Admin: votaciones
+    path('panel/votaciones/',                    views.admin_votings,      name='admin_votings'),
+    path('panel/votaciones/nueva/',              views.admin_voting_form,  name='admin_voting_new'),
+    path('panel/votaciones/<int:voting_id>/',    views.admin_voting_form,  name='admin_voting_edit'),
+    # Pública: votar + dashboard live
+    path('votar/<uuid:token>/',                  views.public_vote,        name='public_vote'),
+    path('votar/<uuid:token>/resultados/',       views.public_vote_results, name='public_vote_results'),
+    path('votar/<uuid:token>/api/',              views.voting_api,          name='voting_api'),
+    # Recuperación de contraseña
+    path('forgot-password/',               views.forgot_password_view, name='forgot_password'),
+    path('reset-password/<uuid:token>/',   views.reset_password_view,  name='reset_password'),
 ]

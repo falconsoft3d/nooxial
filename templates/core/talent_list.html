@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Talento – Nooxial{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-gray-50">
+
+  <!-- Hero -->
+  <div class="bg-white border-b border-gray-100">
+    <div class="max-w-5xl mx-auto px-4 py-12">
+      <h1 class="text-3xl font-black text-gray-900">Talento disponible</h1>
+      <p class="text-gray-500 mt-2">Descubre profesionales que han compartido su currículum públicamente.</p>
+
+      <!-- Búsqueda -->
+      <form method="get" class="mt-6 flex gap-3 max-w-xl">
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nombre, cargo, habilidades…"
+               class="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        <button type="submit"
+                class="px-5 py-2.5 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-700 transition-colors">
+          Buscar
+        </button>
+        {% if q %}
+        <a href="{% url 'talent_list' %}" class="px-4 py-2.5 border border-gray-200 text-sm font-semibold text-gray-600 rounded-xl hover:bg-gray-50 transition-colors">
+          Limpiar
+        </a>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+
+  <!-- Resultados -->
+  <div class="max-w-5xl mx-auto px-4 py-10">
+    {% if q %}
+    <p class="text-sm text-gray-400 mb-6">{{ profiles|length }} resultado{{ profiles|length|pluralize:"s" }} para "<strong>{{ q }}</strong>"</p>
+    {% endif %}
+
+    {% if profiles %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      {% for profile in profiles %}
+      <a href="{% url 'accounts:public_cv' profile.user.username %}"
+         class="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-md hover:border-brand-200 transition-all group">
+
+        <div class="flex items-center gap-4 mb-4">
+          {% if profile.photo %}
+          <img src="{{ profile.photo.url }}" alt="Foto"
+               class="w-12 h-12 rounded-full object-cover flex-shrink-0 border-2 border-gray-100">
+          {% else %}
+          <div class="w-12 h-12 rounded-full bg-brand-100 flex items-center justify-center text-base font-bold text-brand-700 flex-shrink-0">
+            {{ profile.user.first_name|first|upper }}{{ profile.user.last_name|first|upper }}
+          </div>
+          {% endif %}
+          <div class="min-w-0">
+            <p class="font-bold text-gray-900 truncate group-hover:text-brand-700 transition-colors">
+              {{ profile.user.get_full_name|default:profile.user.username }}
+            </p>
+            {% if profile.company %}
+            <p class="text-xs text-gray-400 truncate">{{ profile.company.name }}</p>
+            {% endif %}
+          </div>
+        </div>
+
+        {% if profile.cv_headline %}
+        <p class="text-sm font-semibold text-brand-600 mb-2 truncate">{{ profile.cv_headline }}</p>
+        {% endif %}
+
+        {% if profile.cv_summary %}
+        <p class="text-xs text-gray-500 leading-relaxed line-clamp-3">{{ profile.cv_summary }}</p>
+        {% endif %}
+
+        {% if profile.cv_skills %}
+        <div class="flex flex-wrap gap-1 mt-3">
+          {% for skill in profile.cv_skills.split|slice:":4" %}
+          {% if skill %}
+          <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-0.5 rounded-full">{{ skill|cut:"," }}</span>
+          {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <p class="text-xs text-brand-600 font-semibold mt-4 group-hover:underline">Ver currículum →</p>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="flex flex-col items-center justify-center py-24 text-center">
+      <div class="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+        <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+      </div>
+      <p class="font-semibold text-gray-500">
+        {% if q %}No se encontraron resultados para "{{ q }}"{% else %}Aún no hay currículums públicos{% endif %}
+      </p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

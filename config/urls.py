@@ -28,4 +28,5 @@ urlpatterns = [
     path('blog/', __import__('core.views', fromlist=['blog_list']).blog_list, name='blog_list'),
     path('blog/<slug:slug>/', __import__('core.views', fromlist=['blog_detail']).blog_detail, name='blog_detail'),
     path('blog/<slug:slug>/comentar/', __import__('core.views', fromlist=['blog_comment']).blog_comment, name='blog_comment'),
+    path('talento/', __import__('core.views', fromlist=['talent_list']).talent_list, name='talent_list'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

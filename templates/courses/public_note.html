@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ note.title }} – Nooxial{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-gray-50">
+
+  <header class="bg-white border-b border-gray-100">
+    <div class="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
+      <a href="/" class="text-xl font-black tracking-tight text-gray-900">
+        <span class="text-brand-400">N</span>ooxial
+      </a>
+      <span class="text-xs text-gray-400 flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.172-4.243a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+        </svg>
+        Nota compartida
+      </span>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-6 py-12">
+    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+
+      <!-- Header de la nota -->
+      <div class="px-8 pt-8 pb-5 border-b border-gray-50">
+        <h1 class="text-3xl font-black text-gray-900">{{ note.title }}</h1>
+        <div class="flex items-center gap-3 mt-3 text-xs text-gray-400">
+          <span>Por {{ note.user.get_full_name|default:note.user.username }}</span>
+          <span>·</span>
+          <span>{{ note.updated_at|date:"d M Y, H:i" }}</span>
+        </div>
+      </div>
+
+      <!-- Contenido -->
+      <div class="px-8 py-8">
+        {% if note.content %}
+        <pre class="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap font-sans">{{ note.content }}</pre>
+        {% else %}
+        <p class="text-gray-400 italic">Esta nota está vacía.</p>
+        {% endif %}
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="py-6 text-center text-xs text-gray-400 border-t border-gray-100">
+    Nota compartida mediante <strong class="text-gray-600">Nooxial</strong>
+  </footer>
+</div>
+{% endblock %}

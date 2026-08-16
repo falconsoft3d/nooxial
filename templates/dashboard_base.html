@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 
+{% block navbar %}{% endblock %}
+{% block footer %}{% endblock %}
+
 {% block body %}
 <div class="min-h-screen bg-gray-50 flex">
 
@@ -48,6 +51,50 @@
         Documentos
       </a>
 
+      <a href="{% url 'courses:my_docs' %}"
+         class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm transition-colors
+                {% if active_nav == 'my_docs' %}bg-brand-50 text-gray-900{% else %}text-gray-500 hover:bg-gray-50 hover:text-gray-900{% endif %}">
+        <svg class="w-5 h-5 {% if active_nav == 'my_docs' %}text-brand-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+        </svg>
+        Mis documentos
+      </a>
+
+      <a href="{% url 'courses:teachers' %}"
+         class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm transition-colors
+                {% if active_nav == 'teachers' %}bg-brand-50 text-gray-900{% else %}text-gray-500 hover:bg-gray-50 hover:text-gray-900{% endif %}">
+        <svg class="w-5 h-5 {% if active_nav == 'teachers' %}text-brand-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"/>
+        </svg>
+        Profesores
+      </a>
+
+      <!-- ─ PERFIL ─ -->
+      {% if user.is_staff %}
+      <a href="{% url 'courses:teacher_inbox' %}"
+         class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm transition-colors
+                text-gray-500 hover:bg-gray-50 hover:text-gray-900">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+        </svg>
+        Mis mensajes
+      </a>
+      {% endif %}
+
+      <!-- ─ REUNIÓN ─ -->
+      <a href="{% url 'accounts:meeting' %}"
+         class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm transition-colors
+                {% if active_nav == 'meeting' %}bg-brand-50 text-gray-900{% else %}text-gray-500 hover:bg-gray-50 hover:text-gray-900{% endif %}">
+        <svg class="w-5 h-5 {% if active_nav == 'meeting' %}text-brand-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+        </svg>
+        Reunión
+      </a>
+
       <!-- ─ PERFIL ─ -->
       <a href="{% url 'accounts:profile' %}"
          class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm transition-colors
@@ -63,7 +110,7 @@
       {% if user.is_staff %}
       <div class="pt-3 mt-3 border-t border-gray-100">
         <p class="px-4 mb-1 text-xs font-semibold text-gray-400 uppercase tracking-widest">Administración</p>
-        <div class="overflow-y-auto" style="max-height: calc(6 * 3.25rem);">
+        <div class="overflow-y-auto" style="max-height: calc(4 * 3.25rem);">
 
         <a href="{% url 'accounts:admin_progress' %}"
            class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm transition-colors
@@ -75,6 +122,26 @@
           Progreso
         </a>
 
+        <a href="{% url 'accounts:admin_votings' %}"
+           class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm transition-colors
+                  {% if active_nav == 'admin_votings' %}bg-brand-50 text-gray-900{% else %}text-gray-500 hover:bg-gray-50 hover:text-gray-900{% endif %}">
+          <svg class="w-5 h-5 {% if active_nav == 'admin_votings' %}text-brand-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+          </svg>
+          Votaciones
+        </a>
+
+        <a href="{% url 'accounts:admin_chat_groups' %}"
+           class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm transition-colors
+                  {% if active_nav == 'admin_chat_groups' %}bg-brand-50 text-gray-900{% else %}text-gray-500 hover:bg-gray-50 hover:text-gray-900{% endif %}">
+          <svg class="w-5 h-5 {% if active_nav == 'admin_chat_groups' %}text-brand-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"/>
+          </svg>
+          Grupos de chat
+        </a>
+
         <a href="{% url 'accounts:admin_users' %}"
            class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm transition-colors
                   {% if active_nav == 'admin_users' %}bg-brand-50 text-gray-900{% else %}text-gray-500 hover:bg-gray-50 hover:text-gray-900{% endif %}">
@@ -83,6 +150,16 @@
               d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
           Usuarios
+        </a>
+
+        <a href="{% url 'accounts:admin_companies' %}"
+           class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm transition-colors
+                  {% if active_nav == 'admin_companies' %}bg-brand-50 text-gray-900{% else %}text-gray-500 hover:bg-gray-50 hover:text-gray-900{% endif %}">
+          <svg class="w-5 h-5 {% if active_nav == 'admin_companies' %}text-brand-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+          </svg>
+          Empresas
         </a>
 
         <a href="{% url 'accounts:admin_categories' %}"
@@ -185,6 +262,16 @@
           Soporte
         </a>
 
+        <a href="{% url 'accounts:admin_contacts' %}"
+           class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm transition-colors
+                  {% if active_nav == 'admin_contacts' %}bg-brand-50 text-gray-900{% else %}text-gray-500 hover:bg-gray-50 hover:text-gray-900{% endif %}">
+          <svg class="w-5 h-5 {% if active_nav == 'admin_contacts' %}text-brand-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          Contactos
+        </a>
+
         <a href="{% url 'accounts:admin_config' %}"
            class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm transition-colors
                   {% if active_nav == 'admin_config' %}bg-brand-50 text-gray-900{% else %}text-gray-500 hover:bg-gray-50 hover:text-gray-900{% endif %}">
@@ -194,6 +281,16 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
           </svg>
           Conf. General
+        </a>
+
+        <a href="{% url 'accounts:admin_terms' %}"
+           class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm transition-colors
+                  {% if active_nav == 'admin_terms' %}bg-brand-50 text-gray-900{% else %}text-gray-500 hover:bg-gray-50 hover:text-gray-900{% endif %}">
+          <svg class="w-5 h-5 {% if active_nav == 'admin_terms' %}text-brand-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          Términos y Condiciones
         </a>
         </div><!-- /scroll -->
       </div>
@@ -234,6 +331,158 @@
     <header class="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between sticky top-0 z-10">
       {% block topbar %}{% endblock %}
       <div class="flex items-center gap-3 ml-auto">
+
+        <!-- Grabación de pantalla -->
+        <div class="relative" id="rec-wrapper">
+          <button id="rec-btn" onclick="toggleScreenRecord()" title="Grabar pantalla"
+                  class="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors relative">
+            <svg id="rec-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+            </svg>
+            <span id="rec-dot" class="hidden absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></span>
+            <span id="rec-dot2" class="hidden absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
+          </button>
+          <!-- Toast -->
+          <div id="rec-toast" class="hidden absolute right-0 top-11 bg-gray-900 text-white text-xs font-semibold px-4 py-2.5 rounded-2xl shadow-xl whitespace-nowrap z-50"></div>
+        </div>
+
+        <!-- Chat directo -->
+        <div class="relative" id="chat-wrapper">
+          <button onclick="toggleChat()" title="Mensajes"
+                  class="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors relative">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+            </svg>
+            <span id="chat-badge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none"></span>
+          </button>
+
+          <!-- Panel chat -->
+          <div id="chat-panel"
+               class="hidden absolute right-0 top-11 w-80 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden z-50 flex flex-col"
+               style="height:440px;">
+
+            <!-- Header -->
+            <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+              <div id="chat-header-conv" class="">
+                <!-- Tabs -->
+                <div id="chat-tabs" class="flex gap-1">
+                  <button onclick="chatSetTab('dm')" id="tab-dm"
+                          class="px-3 py-1 text-xs font-semibold rounded-lg transition-colors bg-gray-900 text-white">
+                    Directos
+                  </button>
+                  <button onclick="chatSetTab('group')" id="tab-group"
+                          class="px-3 py-1 text-xs font-semibold rounded-lg transition-colors text-gray-500 hover:bg-gray-100">
+                    Grupos
+                  </button>
+                </div>
+              </div>
+              <div id="chat-header-thread" class="hidden flex items-center gap-2">
+                <button onclick="chatShowList()" class="text-gray-400 hover:text-gray-700 transition-colors">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                  </svg>
+                </button>
+                <p id="chat-thread-name" class="font-bold text-gray-900 text-sm truncate flex-1"></p>
+              </div>
+              <button onclick="chatShowSearch()" id="chat-new-btn" title="Nueva conversación"
+                      class="w-7 h-7 rounded-full bg-gray-100 hover:bg-brand-100 flex items-center justify-center text-gray-500 hover:text-brand-700 transition-colors flex-shrink-0">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Búsqueda de usuario -->
+            <div id="chat-search-pane" class="hidden flex-shrink-0 px-3 py-2 border-b border-gray-100">
+              <input type="text" id="chat-search-input" placeholder="Buscar usuario…"
+                     oninput="chatSearch(this.value)"
+                     class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition">
+              <div id="chat-search-results" class="mt-2 space-y-1 max-h-36 overflow-y-auto"></div>
+            </div>
+
+            <!-- Lista de conversaciones -->
+            <div id="chat-conv-list" class="flex-1 overflow-y-auto divide-y divide-gray-50">
+              <div class="flex items-center justify-center h-full text-gray-400 text-sm py-8">
+                <div class="text-center">
+                  <p class="text-2xl mb-1">💬</p>
+                  <p>Sin conversaciones</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Hilo de mensajes -->
+            <div id="chat-thread-pane" class="hidden flex-1 overflow-y-auto px-3 py-3 space-y-2" id="chat-msgs"></div>
+
+            <!-- Input mensaje -->
+            <div id="chat-input-pane" class="hidden flex-shrink-0 px-3 py-2 border-t border-gray-100 flex gap-2">
+              <input type="text" id="chat-msg-input" placeholder="Escribe un mensaje…"
+                     class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition"
+                     onkeydown="if(event.key==='Enter'){chatSend();event.preventDefault();}">
+              <button onclick="chatSend()"
+                      class="bg-gray-900 text-white w-8 h-8 rounded-xl flex items-center justify-center hover:bg-gray-700 transition-colors flex-shrink-0">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                </svg>
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Calculadora -->
+        <div class="relative" id="calc-wrapper">
+          <button onclick="toggleCalc()"
+                  title="Calculadora"
+                  class="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1z"/>
+            </svg>
+          </button>
+
+          <!-- Panel calculadora -->
+          <div id="calc-panel"
+               class="hidden absolute right-0 top-11 w-64 bg-gray-900 rounded-3xl shadow-2xl overflow-hidden z-50 select-none">
+            <!-- Pantalla -->
+            <div class="px-4 pt-4 pb-2">
+              <div class="text-right">
+                <p id="calc-expr" class="text-gray-500 text-xs h-4 truncate"></p>
+                <p id="calc-display" class="text-white text-3xl font-black truncate mt-0.5">0</p>
+              </div>
+            </div>
+            <!-- Botones -->
+            <div class="grid grid-cols-4 gap-1 p-3">
+              <!-- Fila 1 -->
+              <button onclick="calcFn('AC')"  class="calc-btn col-span-2 bg-red-500/20 text-red-400 hover:bg-red-500/30">AC</button>
+              <button onclick="calcFn('%')"   class="calc-btn bg-white/10 text-white hover:bg-white/20">%</button>
+              <button onclick="calcFn('/')"   class="calc-btn bg-brand-400/20 text-brand-300 hover:bg-brand-400/30 font-bold">÷</button>
+              <!-- Fila 2 -->
+              <button onclick="calcFn('7')"   class="calc-btn bg-white/10 text-white hover:bg-white/20">7</button>
+              <button onclick="calcFn('8')"   class="calc-btn bg-white/10 text-white hover:bg-white/20">8</button>
+              <button onclick="calcFn('9')"   class="calc-btn bg-white/10 text-white hover:bg-white/20">9</button>
+              <button onclick="calcFn('*')"   class="calc-btn bg-brand-400/20 text-brand-300 hover:bg-brand-400/30 font-bold">×</button>
+              <!-- Fila 3 -->
+              <button onclick="calcFn('4')"   class="calc-btn bg-white/10 text-white hover:bg-white/20">4</button>
+              <button onclick="calcFn('5')"   class="calc-btn bg-white/10 text-white hover:bg-white/20">5</button>
+              <button onclick="calcFn('6')"   class="calc-btn bg-white/10 text-white hover:bg-white/20">6</button>
+              <button onclick="calcFn('-')"   class="calc-btn bg-brand-400/20 text-brand-300 hover:bg-brand-400/30 font-bold">−</button>
+              <!-- Fila 4 -->
+              <button onclick="calcFn('1')"   class="calc-btn bg-white/10 text-white hover:bg-white/20">1</button>
+              <button onclick="calcFn('2')"   class="calc-btn bg-white/10 text-white hover:bg-white/20">2</button>
+              <button onclick="calcFn('3')"   class="calc-btn bg-white/10 text-white hover:bg-white/20">3</button>
+              <button onclick="calcFn('+')"   class="calc-btn bg-brand-400/20 text-brand-300 hover:bg-brand-400/30 font-bold">+</button>
+              <!-- Fila 5 -->
+              <button onclick="calcFn('+/-')" class="calc-btn bg-white/10 text-white hover:bg-white/20">+/−</button>
+              <button onclick="calcFn('0')"   class="calc-btn bg-white/10 text-white hover:bg-white/20">0</button>
+              <button onclick="calcFn('.')"   class="calc-btn bg-white/10 text-white hover:bg-white/20">.</button>
+              <button onclick="calcFn('=')"   class="calc-btn bg-brand-400 text-gray-900 hover:bg-brand-300 font-black">=</button>
+            </div>
+          </div>
+        </div>
+
         <a href="{% url 'accounts:profile' %}"
            class="w-9 h-9 rounded-full overflow-hidden flex items-center justify-center font-bold text-sm text-gray-900 hover:opacity-90 transition-opacity flex-shrink-0">
           {% if user.profile.photo %}
@@ -263,6 +512,20 @@
               </svg>
               Mi perfil
             </a>
+            <form method="POST" action="{% url 'accounts:lock' %}">
+              {% csrf_token %}
+              <button type="submit"
+                      class="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+                Bloquear pantalla
+                {% if not user.profile.has_pin %}
+                <span class="ml-auto text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full">Sin PIN</span>
+                {% endif %}
+              </button>
+            </form>
             <div class="border-t border-gray-100 my-1"></div>
             <a href="{% url 'accounts:logout' %}"
                class="flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors rounded-b-2xl">
@@ -293,6 +556,483 @@ document.addEventListener('click', function(e) {
   if (!document.getElementById('profile-menu-wrapper').contains(e.target)) {
     document.getElementById('profile-dropdown').classList.add('hidden');
   }
+  if (document.getElementById('calc-wrapper') && !document.getElementById('calc-wrapper').contains(e.target)) {
+    document.getElementById('calc-panel').classList.add('hidden');
+  }
+  if (document.getElementById('chat-wrapper') && !document.getElementById('chat-wrapper').contains(e.target)) {
+    document.getElementById('chat-panel').classList.add('hidden');
+  }
 });
+
+/* ── CHAT (DIRECTOS + GRUPOS) ───────────────────────── */
+(function() {
+  var currentPartner = null;   // { id, name } para DM
+  var currentGroup   = null;   // { id, name } para grupo
+  var currentTab     = 'dm';   // 'dm' | 'group'
+  var pollTimer      = null;
+  var lastGroupMsgId = 0;
+  var prevBadgeTotal  = 0;
+  var firstBadgeCheck = true;
+  var seenGroupMsgIds = JSON.parse(localStorage.getItem('nooxial_seen_groups') || '{}');
+
+  // ── Sonido de notificación ────────────────────────────────────
+  function playNotifSound() {
+    try {
+      var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      var osc  = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.35);
+    } catch(e) {}
+  }
+
+  var URLS = {
+    conversations: '{% url "accounts:dm_conversations" %}',
+    thread:        '{% url "accounts:dm_thread" user_id=1 %}'.replace('/1/', '/'),
+    send:          '{% url "accounts:dm_send" %}',
+    search:        '{% url "accounts:dm_user_search" %}',
+    groups:        '{% url "accounts:user_groups_api" %}',
+    groupMsgs:     '{% url "accounts:group_messages_api" group_id=1 %}'.replace('/1/mensajes/', '/'),
+  };
+
+  function csrfToken() {
+    var el = document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+  }
+
+  // ── Tabs ──────────────────────────────────────────────────────
+  window.chatSetTab = function(tab) {
+    currentTab = tab;
+    currentPartner = null;
+    currentGroup   = null;
+    lastGroupMsgId = 0;
+    // Estilos
+    document.getElementById('tab-dm').className    = 'px-3 py-1 text-xs font-semibold rounded-lg transition-colors ' + (tab === 'dm'    ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100');
+    document.getElementById('tab-group').className = 'px-3 py-1 text-xs font-semibold rounded-lg transition-colors ' + (tab === 'group' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100');
+    // Botón +: solo en DMs
+    document.getElementById('chat-new-btn').classList.toggle('hidden', tab === 'group');
+    chatShowList();
+  };
+
+  window.toggleChat = function() {
+    var panel = document.getElementById('chat-panel');
+    var hidden = panel.classList.toggle('hidden');
+    if (!hidden) {
+      if (currentTab === 'dm') loadConversations();
+      else loadGroups();
+      startPoll();
+    } else { stopPoll(); }
+  };
+
+  function startPoll() {
+    stopPoll();
+    pollTimer = setInterval(function() {
+      if (currentGroup) {
+        pollGroupMessages();
+      } else if (currentPartner) {
+        loadThread(currentPartner.id, currentPartner.name, false);
+      } else {
+        if (currentTab === 'dm') loadConversations();
+        else loadGroups();
+      }
+    }, 4000);
+  }
+  function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
+  // ── DM: lista de conversaciones ───────────────────────────────
+  function loadConversations() {
+    fetch(URLS.conversations).then(r => r.json()).then(function(data) {
+      var badge = document.getElementById('chat-badge');
+      if (data.total_unread > 0) {
+        badge.textContent = data.total_unread > 9 ? '9+' : data.total_unread;
+        badge.classList.remove('hidden');
+      } else { badge.classList.add('hidden'); }
+      var list = document.getElementById('chat-conv-list');
+      if (!data.conversations.length) {
+        list.innerHTML = '<div class="flex items-center justify-center h-full text-gray-400 text-sm py-8"><div class="text-center"><p class="text-2xl mb-1">💬</p><p>Sin conversaciones todavía</p><p class="text-xs mt-1">Pulsa + para iniciar una</p></div></div>';
+        return;
+      }
+      list.innerHTML = data.conversations.map(function(c) {
+        return '<button onclick="chatOpenThread(' + c.user_id + ',\'' + c.name.replace(/'/g, "\\'") + '\')" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">' +
+          '<div class="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center text-sm font-bold text-brand-700 flex-shrink-0">' + c.avatar + '</div>' +
+          '<div class="flex-1 min-w-0"><div class="flex items-center justify-between"><p class="text-sm font-semibold text-gray-900 truncate">' + c.name + '</p><span class="text-xs text-gray-400 flex-shrink-0 ml-1">' + c.last_time + '</span></div><p class="text-xs text-gray-500 truncate">' + c.last_msg + '</p></div>' +
+          (c.unread ? '<span class="w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center flex-shrink-0">' + c.unread + '</span>' : '') +
+          '</button>';
+      }).join('');
+    });
+  }
+
+  window.chatOpenThread = function(userId, name) {
+    currentPartner = { id: userId, name: name };
+    currentGroup   = null;
+    loadThread(userId, name, true);
+  };
+
+  function loadThread(userId, name, scroll) {
+    fetch(URLS.thread + userId + '/').then(r => r.json()).then(function(data) {
+      showThreadPane(data.partner_name || name);
+      var threadPane = document.getElementById('chat-thread-pane');
+      threadPane.innerHTML = data.messages.map(function(m) {
+        return msgBubble(m.mine, m.content, m.time, '');
+      }).join('') || '<div class="text-center text-gray-400 text-sm py-6">Inicia la conversación</div>';
+      if (scroll) threadPane.scrollTop = threadPane.scrollHeight;
+      document.getElementById('chat-msg-input').focus();
+    });
+  }
+
+  // ── Grupos ────────────────────────────────────────────────────
+  function loadGroups() {
+    fetch(URLS.groups).then(r => r.json()).then(function(data) {
+      var list = document.getElementById('chat-conv-list');
+      if (!data.groups.length) {
+        list.innerHTML = '<div class="flex items-center justify-center h-full text-gray-400 text-sm py-8"><div class="text-center"><p class="text-2xl mb-1">👥</p><p>No perteneces a ningún grupo</p></div></div>';
+        return;
+      }
+      list.innerHTML = data.groups.map(function(g) {
+        return '<button onclick="chatOpenGroup(' + g.id + ',\'' + g.name.replace(/'/g, "\\'") + '\')" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">' +
+          '<div class="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-sm font-bold text-indigo-700 flex-shrink-0">' +
+            '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>' +
+          '</div>' +
+          '<div class="flex-1 min-w-0"><p class="text-sm font-semibold text-gray-900 truncate">' + g.name + '</p><p class="text-xs text-gray-500 truncate">' + (g.last || 'Sin mensajes') + '</p></div>' +
+          '</button>';
+      }).join('');
+    });
+  }
+
+  window.chatOpenGroup = function(groupId, name) {
+    currentGroup   = { id: groupId, name: name };
+    currentPartner = null;
+    lastGroupMsgId = 0;
+    showThreadPane(name);
+    loadGroupMessages(true);
+    // Marcar como leído
+    seenGroupMsgIds[groupId] = Date.now(); // placeholder; se actualiza en loadGroupMessages
+    localStorage.setItem('nooxial_seen_groups', JSON.stringify(seenGroupMsgIds));
+  };
+
+  function loadGroupMessages(scroll) {
+    if (!currentGroup) return;
+    fetch(URLS.groupMsgs + currentGroup.id + '/mensajes/?since=0').then(r => r.json()).then(function(data) {
+      var threadPane = document.getElementById('chat-thread-pane');
+      if (!data.messages.length) {
+        threadPane.innerHTML = '<div class="text-center text-gray-400 text-sm py-6">Sé el primero en escribir</div>';
+        return;
+      }
+      threadPane.innerHTML = data.messages.map(function(m) {
+        return msgBubble(m.mine, m.content, m.time, m.mine ? '' : m.sender);
+      }).join('');
+      lastGroupMsgId = data.messages[data.messages.length - 1].id;
+      // Marcar como leído
+      seenGroupMsgIds[currentGroup.id] = lastGroupMsgId;
+      localStorage.setItem('nooxial_seen_groups', JSON.stringify(seenGroupMsgIds));
+      if (scroll) threadPane.scrollTop = threadPane.scrollHeight;
+      document.getElementById('chat-msg-input').focus();
+    });
+  }
+
+  function pollGroupMessages() {
+    if (!currentGroup) return;
+    fetch(URLS.groupMsgs + currentGroup.id + '/mensajes/?since=' + lastGroupMsgId).then(r => r.json()).then(function(data) {
+      if (!data.messages.length) return;
+      var threadPane = document.getElementById('chat-thread-pane');
+      var wasAtBottom = threadPane.scrollHeight - threadPane.scrollTop <= threadPane.clientHeight + 40;
+      var hasNewFromOthers = false;
+      data.messages.forEach(function(m) {
+        var div = document.createElement('div');
+        div.innerHTML = msgBubble(m.mine, m.content, m.time, m.mine ? '' : m.sender);
+        threadPane.appendChild(div.firstElementChild);
+        lastGroupMsgId = m.id;
+        if (!m.mine) hasNewFromOthers = true;
+      });
+      // Marcar como leído (estamos en el hilo)
+      seenGroupMsgIds[currentGroup.id] = lastGroupMsgId;
+      localStorage.setItem('nooxial_seen_groups', JSON.stringify(seenGroupMsgIds));
+      if (hasNewFromOthers) playNotifSound();
+      if (wasAtBottom) threadPane.scrollTop = threadPane.scrollHeight;
+    });
+  }
+
+  // ── Shared UI helpers ─────────────────────────────────────────
+  function msgBubble(mine, content, time, sender) {
+    return '<div class="flex ' + (mine ? 'justify-end' : 'justify-start') + '">' +
+      '<div class="max-w-[75%] ' + (mine ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900') + ' rounded-2xl px-3 py-2">' +
+        (sender ? '<p class="text-[10px] font-semibold ' + (mine ? 'text-gray-400' : 'text-brand-600') + ' mb-0.5">' + sender + '</p>' : '') +
+        '<p class="text-sm leading-relaxed">' + content.replace(/</g,'&lt;') + '</p>' +
+        '<p class="text-[10px] text-gray-400 mt-0.5 text-right">' + time + '</p>' +
+      '</div></div>';
+  }
+
+  function showThreadPane(name) {
+    document.getElementById('chat-header-conv').classList.add('hidden');
+    document.getElementById('chat-header-thread').classList.remove('hidden');
+    document.getElementById('chat-new-btn').classList.add('hidden');
+    document.getElementById('chat-thread-name').textContent = name;
+    document.getElementById('chat-conv-list').classList.add('hidden');
+    document.getElementById('chat-search-pane').classList.add('hidden');
+    document.getElementById('chat-thread-pane').classList.remove('hidden');
+    document.getElementById('chat-input-pane').classList.remove('hidden');
+  }
+
+  window.chatShowList = function() {
+    currentPartner = null;
+    currentGroup   = null;
+    lastGroupMsgId = 0;
+    document.getElementById('chat-header-conv').classList.remove('hidden');
+    document.getElementById('chat-header-thread').classList.add('hidden');
+    document.getElementById('chat-new-btn').classList.toggle('hidden', currentTab === 'group');
+    document.getElementById('chat-conv-list').classList.remove('hidden');
+    document.getElementById('chat-thread-pane').classList.add('hidden');
+    document.getElementById('chat-input-pane').classList.add('hidden');
+    document.getElementById('chat-search-pane').classList.add('hidden');
+    if (currentTab === 'dm') loadConversations();
+    else loadGroups();
+  };
+
+  window.chatShowSearch = function() {
+    var pane = document.getElementById('chat-search-pane');
+    pane.classList.toggle('hidden');
+    if (!pane.classList.contains('hidden')) document.getElementById('chat-search-input').focus();
+  };
+
+  window.chatSearch = function(q) {
+    if (q.length < 2) { document.getElementById('chat-search-results').innerHTML = ''; return; }
+    fetch(URLS.search + '?q=' + encodeURIComponent(q)).then(r => r.json()).then(function(data) {
+      document.getElementById('chat-search-results').innerHTML = data.users.map(function(u) {
+        return '<button onclick="chatOpenThread(' + u.id + ',\'' + u.name.replace(/'/g, "\\'") + '\')" class="w-full flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-gray-50 transition-colors text-left">' +
+          '<div class="w-7 h-7 rounded-full bg-brand-100 flex items-center justify-center text-xs font-bold text-brand-700 flex-shrink-0">' + u.avatar + '</div>' +
+          '<div><p class="text-sm font-medium text-gray-900">' + u.name + '</p><p class="text-xs text-gray-400">@' + u.username + '</p></div></button>';
+      }).join('') || '<p class="text-xs text-gray-400 text-center py-2">Sin resultados</p>';
+    });
+  };
+
+  window.chatSend = function() {
+    var input   = document.getElementById('chat-msg-input');
+    var content = input.value.trim();
+    if (!content) return;
+    input.value = '';
+
+    if (currentGroup) {
+      fetch(URLS.groupMsgs + currentGroup.id + '/mensajes/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
+        body: JSON.stringify({ content: content }),
+      }).then(r => r.json()).then(function(data) {
+        if (data.ok) {
+          var threadPane = document.getElementById('chat-thread-pane');
+          var div = document.createElement('div');
+          div.innerHTML = msgBubble(true, data.content, data.time, '');
+          threadPane.appendChild(div.firstElementChild);
+          threadPane.scrollTop = threadPane.scrollHeight;
+          lastGroupMsgId = data.id;
+        }
+      });
+    } else if (currentPartner) {
+      fetch(URLS.send, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
+        body: JSON.stringify({ recipient_id: currentPartner.id, content: content }),
+      }).then(r => r.json()).then(function(data) {
+        if (data.ok) loadThread(currentPartner.id, currentPartner.name, true);
+      });
+    }
+  };
+
+  // Badge: DMs no leídos + grupos con mensajes nuevos
+  function refreshBadge() {
+    fetch(URLS.conversations).then(r => r.json()).then(function(dmData) {
+      var dmUnread = dmData.total_unread || 0;
+      fetch(URLS.groups).then(r => r.json()).then(function(gData) {
+        var groupUnread = 0;
+        (gData.groups || []).forEach(function(g) {
+          var seen = parseInt(seenGroupMsgIds[g.id] || 0, 10);
+          if (g.last_msg_id && g.last_msg_id > seen) groupUnread++;
+        });
+        var total = dmUnread + groupUnread;
+        var badge = document.getElementById('chat-badge');
+        if (total > 0) {
+          badge.textContent = total > 9 ? '9+' : total;
+          badge.classList.remove('hidden');
+          if (!firstBadgeCheck && total > prevBadgeTotal) playNotifSound();
+        } else {
+          badge.classList.add('hidden');
+        }
+        prevBadgeTotal  = total;
+        firstBadgeCheck = false;
+      }).catch(function(){});
+    }).catch(function(){});
+  }
+  setInterval(refreshBadge, 8000);
+  refreshBadge();
+})();
+
+/* ── GRABACIÓN DE PANTALLA ───────────────────────────── */
+(function() {
+  var recorder   = null;
+  var recStream  = null;
+  var chunks     = [];
+  var UPLOAD_URL = '{% url "courses:my_docs_record_upload" %}';
+
+  function csrf() {
+    var el = document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+  }
+
+  function showToast(msg, ms) {
+    var t = document.getElementById('rec-toast');
+    t.textContent = msg;
+    t.classList.remove('hidden');
+    clearTimeout(t._tid);
+    t._tid = setTimeout(function() { t.classList.add('hidden'); }, ms || 3000);
+  }
+
+  function setRecording(on) {
+    var btn  = document.getElementById('rec-btn');
+    var dot  = document.getElementById('rec-dot');
+    var dot2 = document.getElementById('rec-dot2');
+    btn.classList.toggle('border-red-400', on);
+    btn.classList.toggle('text-red-500', on);
+    dot.classList.toggle('hidden', !on);
+    dot2.classList.toggle('hidden', !on);
+  }
+
+  function doUpload(mimeType) {
+    if (!chunks.length) { showToast('No se capturó nada'); recorder = null; return; }
+    var blob = new Blob(chunks, { type: mimeType });
+    showToast('Subiendo grabación…', 20000);
+    var fd = new FormData();
+    fd.append('recording', blob, 'grabacion.webm');
+    fetch(UPLOAD_URL, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrf() },
+      body: fd,
+    }).then(r => r.json()).then(function(data) {
+      showToast(data.ok ? '✓ Guardado en Mis documentos → Grabaciones' : 'Error: ' + (data.error || ''), 5000);
+    }).catch(function() { showToast('Error de red al subir', 4000); });
+    recorder = null;
+  }
+
+  window.toggleScreenRecord = async function() {
+    // Detener si está grabando
+    if (recorder && recorder.state === 'recording') {
+      recorder.stop();
+      return;
+    }
+    // Si ya existe pero parado, limpiar
+    recorder = null; chunks = [];
+    if (recStream) { recStream.getTracks().forEach(t => t.stop()); recStream = null; }
+
+    // Capturar pantalla
+    try {
+      recStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
+    } catch(e) { showToast('Grabación cancelada'); return; }
+
+    // Capturar micrófono aparte (getDisplayMedia no capta mic en la mayoría de OS)
+    var micStream = null;
+    try { micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); } catch(e) {}
+
+    var tracks = [recStream.getVideoTracks()[0]];
+    if (micStream) tracks.push(micStream.getAudioTracks()[0]);
+    var combined = new MediaStream(tracks);
+
+    // Seleccionar mimeType compatible
+    var mimeType = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm']
+      .find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm';
+
+    recorder = new MediaRecorder(combined, { mimeType: mimeType });
+    chunks = [];
+
+    recorder.ondataavailable = function(e) { if (e.data && e.data.size > 0) chunks.push(e.data); };
+    recorder.onstop = function() {
+      setRecording(false);
+      if (recStream) { recStream.getTracks().forEach(t => t.stop()); recStream = null; }
+      if (micStream) { micStream.getTracks().forEach(t => t.stop()); }
+      doUpload(mimeType);
+    };
+
+    // Si el usuario para desde la barra del navegador
+    recStream.getVideoTracks()[0].addEventListener('ended', function() {
+      if (recorder && recorder.state === 'recording') recorder.stop();
+    });
+
+    recorder.start(1000); // chunk cada segundo — más fiable para subida
+    setRecording(true);
+    showToast('🔴 Grabando — pulsa de nuevo para detener', 60000);
+  };
+})();
+
+/* ── CALCULADORA ─────────────────────────────────────── */(function() {
+  var expr     = '';
+  var display  = '0';
+  var lastOp   = false;
+  var justEval = false;
+
+  function updateDisplay() {
+    document.getElementById('calc-display').textContent = display.length > 10 ? parseFloat(display).toPrecision(8) : display;
+    document.getElementById('calc-expr').textContent = expr;
+  }
+
+  window.toggleCalc = function() {
+    document.getElementById('calc-panel').classList.toggle('hidden');
+  };
+
+  window.calcFn = function(key) {
+    if (key === 'AC') {
+      expr = ''; display = '0'; lastOp = false; justEval = false;
+    } else if (key === '+/-') {
+      if (display !== '0') {
+        display = display.startsWith('-') ? display.slice(1) : '-' + display;
+      }
+    } else if (key === '%') {
+      try { display = String(parseFloat(display) / 100); } catch(e) {}
+    } else if (key === '=') {
+      try {
+        var full = expr + display;
+        var result = Function('"use strict"; return (' + full.replace(/÷/g,'/').replace(/×/g,'*') + ')')();
+        result = parseFloat(result.toPrecision(12));
+        expr = ''; display = String(result); justEval = true;
+      } catch(e) { display = 'Error'; expr = ''; }
+    } else if (['+','-','*','/'].includes(key)) {
+      expr = expr + display + key;
+      display = '0'; lastOp = true; justEval = false;
+    } else if (key === '.') {
+      if (justEval) { display = '0'; justEval = false; }
+      if (!display.includes('.')) display += '.';
+    } else {
+      // Dígito
+      if (display === '0' || justEval || lastOp) {
+        display = key; justEval = false; lastOp = false;
+      } else {
+        if (display.replace('-','').length < 12) display += key;
+      }
+    }
+    updateDisplay();
+  };
+
+  // Teclado físico en la calculadora
+  document.addEventListener('keydown', function(e) {
+    if (document.getElementById('calc-panel').classList.contains('hidden')) return;
+    var map = {'0':'0','1':'1','2':'2','3':'3','4':'4','5':'5','6':'6','7':'7','8':'8','9':'9',
+               '+':'+','-':'-','*':'*','/':'/','Enter':'=','Backspace':'AC','.':'.'};
+    if (map[e.key]) { e.preventDefault(); calcFn(map[e.key]); }
+  });
+})();
 </script>
+
+<style>
+.calc-btn {
+  height: 3rem;
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.1s;
+  active:scale: 0.95;
+}
+.calc-btn:active { transform: scale(0.93); }
+</style>
 {% endblock %}

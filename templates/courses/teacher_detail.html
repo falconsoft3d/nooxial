@@ -1,0 +1,245 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ teacher.get_full_name|default:teacher.username }} – Nooxial{% endblock %}
+
+{% block topbar %}
+<nav class="flex items-center gap-1.5 text-sm text-gray-400">
+  <a href="{% url 'courses:teachers' %}" class="hover:text-gray-700">Profesores</a>
+  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <span class="text-gray-900 font-semibold">{{ teacher.get_full_name|default:teacher.username }}</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+{% if messages %}
+<div class="mb-5 space-y-2">
+  {% for msg in messages %}
+  <div class="px-4 py-3 rounded-xl text-sm font-medium
+    {% if msg.tags == 'error' %}bg-red-50 text-red-700{% else %}bg-brand-50 text-brand-700{% endif %}">{{ msg }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="grid lg:grid-cols-3 gap-6 items-start">
+
+  <!-- Columna izquierda: perfil + valorar -->
+  <div class="space-y-5">
+
+    <!-- Perfil -->
+    <div class="bg-white rounded-3xl border border-gray-100 p-6 text-center">
+      {% if teacher.profile.photo %}
+      <img src="{{ teacher.profile.photo.url }}" alt="{{ teacher.get_full_name }}"
+           class="w-20 h-20 rounded-2xl object-cover mx-auto mb-3">
+      {% else %}
+      <div class="w-20 h-20 rounded-2xl bg-brand-100 flex items-center justify-center text-3xl font-black text-brand-700 mx-auto mb-3">
+        {{ teacher.first_name|first|upper }}{{ teacher.last_name|first|upper }}
+      </div>
+      {% endif %}
+      <h1 class="text-lg font-black text-gray-900">{{ teacher.get_full_name|default:teacher.username }}</h1>
+      <p class="text-xs text-gray-400">@{{ teacher.username }}</p>
+
+      <!-- Estrellas globales -->
+      <div class="flex items-center justify-center gap-1 mt-3">
+        {% for i in "12345" %}
+        <svg class="w-5 h-5 {% if avg_rating and forloop.counter <= avg_rating %}text-yellow-400{% else %}text-gray-200{% endif %} fill-current" viewBox="0 0 20 20">
+          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+        </svg>
+        {% endfor %}
+      </div>
+      {% if avg_rating %}
+      <p class="text-xs text-gray-400 mt-1">{{ avg_rating|floatformat:1 }} / 5 · {{ all_ratings|length }} valoracion{{ all_ratings|length|pluralize:"es" }}</p>
+      {% else %}
+      <p class="text-xs text-gray-400 mt-1">Sin valoraciones todavía</p>
+      {% endif %}
+
+      <!-- Cursos compartidos -->
+      {% if shared_courses %}
+      <div class="mt-4 text-left border-t border-gray-100 pt-4">
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Tus cursos con este profesor</p>
+        <div class="space-y-1">
+          {% for c in shared_courses %}
+          <a href="{% url 'courses:course_detail' c.slug %}"
+             class="flex items-center gap-2 text-xs text-gray-600 hover:text-brand-600 transition-colors">
+            <span class="text-base">{{ c.emoji }}</span>{{ c.title }}
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Valorar al profesor -->
+    <div class="bg-white rounded-3xl border border-gray-100 p-6">
+      <h2 class="text-sm font-bold text-gray-900 mb-4">
+        {% if my_rating %}Actualizar mi valoración{% else %}Valorar al profesor{% endif %}
+      </h2>
+      <form method="POST" action="{% url 'courses:teacher_rate' teacher.pk %}" class="space-y-4">
+        {% csrf_token %}
+
+        <!-- Estrellas interactivas -->
+        <div class="flex gap-1.5" id="star-row">
+          {% for i in "12345" %}
+          <button type="button" data-val="{{ forloop.counter }}" onclick="setRating({{ forloop.counter }})"
+                  class="star-btn w-9 h-9 rounded-xl transition-colors
+                         {% if my_rating and forloop.counter <= my_rating.rating %}bg-yellow-400 text-white{% else %}bg-gray-100 text-gray-400 hover:bg-yellow-100{% endif %}">
+            <svg class="w-5 h-5 mx-auto fill-current" viewBox="0 0 20 20">
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+            </svg>
+          </button>
+          {% endfor %}
+        </div>
+        <input type="hidden" name="rating" id="rating-input" value="{{ my_rating.rating|default:5 }}">
+
+        <div>
+          <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+            Comentario público <span class="font-normal text-gray-300">(opcional)</span>
+          </label>
+          <textarea name="comment" rows="3" placeholder="Comparte tu experiencia con este profesor…"
+                    class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none
+                           focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition">{{ my_rating.comment|default:'' }}</textarea>
+        </div>
+
+        <button type="submit"
+                class="w-full bg-gray-900 text-white font-bold py-3 rounded-full hover:bg-gray-700 transition-colors text-sm">
+          {% if my_rating %}Actualizar valoración{% else %}Enviar valoración{% endif %}
+        </button>
+      </form>
+    </div>
+
+    <!-- Valoraciones de otros estudiantes -->
+    {% if all_ratings %}
+    <div class="bg-white rounded-3xl border border-gray-100 p-6">
+      <h2 class="text-sm font-bold text-gray-900 mb-4">Valoraciones ({{ all_ratings|length }})</h2>
+      <div class="space-y-4">
+        {% for r in all_ratings %}
+        <div class="flex gap-3">
+          <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600 flex-shrink-0">
+            {{ r.student.first_name|first|upper }}{{ r.student.last_name|first|upper }}
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-semibold text-gray-800">{{ r.student.get_full_name|default:r.student.username }}</span>
+              <div class="flex gap-0.5">
+                {% for i in "12345" %}
+                <svg class="w-3 h-3 {% if forloop.counter <= r.rating %}text-yellow-400{% else %}text-gray-200{% endif %} fill-current" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                </svg>
+                {% endfor %}
+              </div>
+            </div>
+            {% if r.comment %}<p class="text-xs text-gray-500 mt-0.5">{{ r.comment }}</p>{% endif %}
+            <p class="text-xs text-gray-300 mt-0.5">{{ r.created_at|date:"d M Y" }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Columna derecha: mensajes -->
+  <div class="lg:col-span-2">
+    {% if request.user == teacher %}
+    <div class="bg-gray-50 rounded-3xl border border-dashed border-gray-200 flex items-center justify-center" style="height:560px;">
+      <div class="text-center text-gray-400 px-6">
+        <p class="text-3xl mb-2">👨‍🏫</p>
+        <p class="font-semibold text-gray-600">Este es tu perfil de profesor</p>
+        <p class="text-sm mt-1">Los estudiantes te enviarán mensajes aquí</p>
+        <a href="{% url 'courses:teacher_inbox' %}"
+           class="mt-4 inline-block bg-gray-900 text-white font-bold px-6 py-2.5 rounded-full hover:bg-gray-700 transition-colors text-sm">
+          Ver mis mensajes
+        </a>
+      </div>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-3xl border border-gray-100 flex flex-col" style="height: 560px;">
+
+      <!-- Header del chat -->
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center gap-3 flex-shrink-0">
+        {% if teacher.profile.photo %}
+        <img src="{{ teacher.profile.photo.url }}" class="w-8 h-8 rounded-full object-cover">
+        {% else %}
+        <div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-xs font-bold text-brand-700">
+          {{ teacher.first_name|first|upper }}
+        </div>
+        {% endif %}
+        <div>
+          <p class="text-sm font-bold text-gray-900">{{ teacher.get_full_name|default:teacher.username }}</p>
+          <p class="text-xs text-gray-400">Canal privado</p>
+        </div>
+      </div>
+
+      <!-- Mensajes -->
+      <div class="flex-1 overflow-y-auto px-5 py-4 space-y-3" id="msg-container">
+        {% if messages %}
+        {% for msg in messages %}
+        <div class="flex {% if msg.sender == request.user %}justify-end{% else %}justify-start{% endif %}">
+          <div class="max-w-xs lg:max-w-md {% if msg.sender == request.user %}bg-gray-900 text-white{% else %}bg-gray-100 text-gray-900{% endif %} rounded-2xl px-4 py-2.5">
+            <p class="text-sm leading-relaxed">{{ msg.content }}</p>
+            <p class="text-xs {% if msg.sender == request.user %}text-gray-400{% else %}text-gray-400{% endif %} mt-1">
+              {{ msg.created_at|date:"d M, H:i" }}
+            </p>
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="flex items-center justify-center h-full">
+          <div class="text-center text-gray-400">
+            <p class="text-4xl mb-2">💬</p>
+            <p class="text-sm font-medium">Empieza la conversación</p>
+            <p class="text-xs mt-0.5">Tu mensaje es privado, solo lo verá el profesor</p>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Input -->
+      <div class="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+        <form method="POST" action="{% url 'courses:teacher_send_message' teacher.pk %}"
+              class="flex gap-3 items-end">
+          {% csrf_token %}
+          <textarea name="content" rows="2" placeholder="Escribe un mensaje al profesor…"
+                    class="flex-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm resize-none
+                           focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition"
+                    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.closest('form').submit();}"></textarea>
+          <button type="submit"
+                  class="bg-gray-900 text-white p-3 rounded-2xl hover:bg-gray-700 transition-colors flex-shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+var currentRating = {{ my_rating.rating|default:5 }};
+function setRating(val) {
+  currentRating = val;
+  document.getElementById('rating-input').value = val;
+  document.querySelectorAll('.star-btn').forEach(function(btn) {
+    var v = parseInt(btn.dataset.val);
+    if (v <= val) {
+      btn.classList.add('bg-yellow-400', 'text-white');
+      btn.classList.remove('bg-gray-100', 'text-gray-400');
+    } else {
+      btn.classList.remove('bg-yellow-400', 'text-white');
+      btn.classList.add('bg-gray-100', 'text-gray-400');
+    }
+  });
+}
+// Scroll al fondo del chat
+var mc = document.getElementById('msg-container');
+if (mc) mc.scrollTop = mc.scrollHeight;
+</script>
+{% endblock %}

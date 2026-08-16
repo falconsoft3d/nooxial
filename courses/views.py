@@ -1,7 +1,9 @@
 from django.shortcuts import render, get_object_or_404, redirect
+from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST
-from django.db.models import Avg
+from django.views.decorators.http import require_POST, require_http_methods
+from django.db.models import F, Q, Avg, Count
+from django.contrib.auth.models import User
 from .models import Course, Category, Enrollment, Lesson, LessonProgress, Exam, ExamAttempt, LessonComment, CourseReview, ExamUpload, Task, TaskSubmission, DocFolder, DocFile
 
 
@@ -77,9 +79,20 @@ def my_courses(request):
                    .prefetch_related('course__categories')
                    .annotate(avg_rating=Avg('course__reviews__rating'))
                    .order_by('-enrolled_at'))
+
+    enrolled_ids = {enr.course_id for enr in enrollments}
+
+    available_courses = (Course.objects
+                         .filter(is_published=True)
+                         .exclude(pk__in=enrolled_ids)
+                         .prefetch_related('categories')
+                         .annotate(avg_rating=Avg('reviews__rating'))
+                         .order_by('-created_at'))
+
     return render(request, 'courses/my_courses.html', {
-        'active_nav':  'my_courses',
-        'enrollments': enrollments,
+        'active_nav':        'my_courses',
+        'enrollments':       enrollments,
+        'available_courses': available_courses,
     })
 
 
@@ -463,3 +476,413 @@ def verify_certificate(request, attempt_id):
         'student': attempt.student,
     })
 
+
+
+# ─── PROFESORES ──────────────────────────────────────────────────
+
+@login_required
+def teachers_list(request):
+    from courses.models import Enrollment, TeacherRating
+    from django.db.models import Avg, Count
+    # Profesores de los cursos en los que está inscrito el estudiante
+    enrolled_course_ids = Enrollment.objects.filter(
+        student=request.user
+    ).values_list("course_id", flat=True)
+
+    teachers = (
+        User.objects
+        .filter(courses_taught__pk__in=enrolled_course_ids, is_active=True)
+        .distinct()
+        .annotate(
+            avg_rating=Avg("teacher_ratings__rating"),
+            rating_count=Count("teacher_ratings"),
+        )
+        .order_by("first_name", "last_name")
+    )
+
+    # Valoraciones ya dadas por este estudiante
+    my_ratings = {
+        r.teacher_id: r.rating
+        for r in TeacherRating.objects.filter(student=request.user)
+    }
+
+    # Mensajes no leídos por profesor
+    from courses.models import TeacherMessage
+    unread = {
+        tm["teacher_id"]: tm["cnt"]
+        for tm in TeacherMessage.objects.filter(
+            student=request.user, sender=F("teacher"), is_read=False
+        ).values("teacher_id").annotate(cnt=Count("id"))
+    }
+
+    return render(request, "courses/teachers.html", {
+        "active_nav": "teachers",
+        "teachers":   teachers,
+        "my_ratings": my_ratings,
+        "unread":     unread,
+    })
+
+
+@login_required
+def teacher_detail(request, teacher_id):
+    from courses.models import TeacherRating, TeacherMessage, Enrollment
+    teacher = get_object_or_404(User, pk=teacher_id, is_active=True)
+
+    # Verificar que el estudiante comparte al menos un curso con el profesor
+    enrolled_course_ids = Enrollment.objects.filter(
+        student=request.user
+    ).values_list("course_id", flat=True)
+    if not User.objects.filter(
+        pk=teacher_id, courses_taught__pk__in=enrolled_course_ids
+    ).exists() and not request.user.is_staff:
+        from django.http import Http404
+        raise Http404
+
+    # Cursos del profesor en los que está inscrito este estudiante
+    from courses.models import Course
+    shared_courses = Course.objects.filter(
+        instructor=teacher, pk__in=enrolled_course_ids, is_published=True
+    )
+
+    # Valoración del estudiante actual
+    my_rating = TeacherRating.objects.filter(
+        teacher=teacher, student=request.user
+    ).first()
+
+    # Todas las valoraciones públicas
+    all_ratings = TeacherRating.objects.filter(
+        teacher=teacher
+    ).select_related("student", "student__profile").order_by("-created_at")
+
+    from django.db.models import Avg
+    avg_rating = all_ratings.aggregate(avg=Avg("rating"))["avg"]
+
+    # Hilo de mensajes con este profesor
+    messages_qs = TeacherMessage.objects.filter(
+        teacher=teacher, student=request.user
+    ).select_related("sender")
+
+    # Marcar como leídos los mensajes del profesor al estudiante
+    TeacherMessage.objects.filter(
+        teacher=teacher, student=request.user, sender=teacher, is_read=False
+    ).update(is_read=True)
+
+    return render(request, "courses/teacher_detail.html", {
+        "active_nav":    "teachers",
+        "teacher":       teacher,
+        "shared_courses": shared_courses,
+        "my_rating":     my_rating,
+        "all_ratings":   all_ratings,
+        "avg_rating":    avg_rating,
+        "messages":      messages_qs,
+    })
+
+
+@login_required
+@require_POST
+def teacher_send_message(request, teacher_id):
+    from courses.models import TeacherMessage
+    from django.contrib import messages as djmsg
+    teacher = get_object_or_404(User, pk=teacher_id, is_active=True)
+    content = request.POST.get("content", "").strip()
+
+    if not content:
+        djmsg.error(request, "El mensaje no puede estar vacío.")
+        if request.user == teacher:
+            return redirect("courses:teacher_inbox")
+        return redirect("courses:teacher_detail", teacher_id=teacher_id)
+
+    # El profesor responde a un estudiante (student_id viene en el POST)
+    if request.user == teacher:
+        student_id = request.POST.get("student_id")
+        if not student_id:
+            djmsg.error(request, "No se ha especificado el destinatario.")
+            return redirect("courses:teacher_inbox")
+        student = get_object_or_404(User, pk=student_id)
+    else:
+        # Un estudiante escribe a su profesor; evitar mensajear a uno mismo
+        if request.user.pk == teacher.pk:
+            djmsg.error(request, "No puedes enviarte un mensaje a ti mismo.")
+            return redirect("courses:teachers")
+        student = request.user
+
+    TeacherMessage.objects.create(
+        teacher=teacher,
+        student=student,
+        sender=request.user,
+        content=content,
+    )
+
+    if request.user == teacher:
+        return redirect("courses:teacher_thread", student_id=student.pk)
+    return redirect("courses:teacher_detail", teacher_id=teacher_id)
+
+
+@login_required
+@require_POST
+def teacher_rate(request, teacher_id):
+    from courses.models import TeacherRating
+    teacher = get_object_or_404(User, pk=teacher_id, is_active=True)
+    try:
+        rating_val = int(request.POST.get("rating", 5))
+        if not 1 <= rating_val <= 5:
+            raise ValueError
+    except (ValueError, TypeError):
+        rating_val = 5
+
+    comment = request.POST.get("comment", "").strip()
+    TeacherRating.objects.update_or_create(
+        teacher=teacher, student=request.user,
+        defaults={"rating": rating_val, "comment": comment},
+    )
+    from django.contrib import messages as djmsg
+    djmsg.success(request, "¡Valoración guardada!")
+    return redirect("courses:teacher_detail", teacher_id=teacher_id)
+
+
+@login_required
+def teacher_inbox(request):
+    """Vista del profesor: bandeja de mensajes de sus estudiantes."""
+    from courses.models import TeacherMessage
+    from django.db.models import Max, Count
+
+    # Hilos agrupados por estudiante
+    threads = (
+        TeacherMessage.objects
+        .filter(teacher=request.user)
+        .values("student_id")
+        .annotate(
+            last_msg=Max("created_at"),
+            unread=Count("id", filter=Q(sender=F("student"), is_read=False)),
+        )
+        .order_by("-last_msg")
+    )
+
+    student_ids = [t["student_id"] for t in threads]
+    students_map = {u.pk: u for u in User.objects.filter(pk__in=student_ids)}
+
+    thread_list = []
+    for t in threads:
+        s = students_map.get(t["student_id"])
+        if s:
+            last = TeacherMessage.objects.filter(
+                teacher=request.user, student=s
+            ).order_by("-created_at").first()
+            thread_list.append({
+                "student": s,
+                "last_msg": last,
+                "unread": t["unread"],
+            })
+
+    return render(request, "courses/teacher_inbox.html", {
+        "active_nav": "teachers",
+        "threads":    thread_list,
+    })
+
+
+@login_required
+def teacher_thread(request, student_id):
+    """El profesor ve el hilo completo con un estudiante."""
+    from courses.models import TeacherMessage
+    student = get_object_or_404(User, pk=student_id)
+    # Solo el profesor del hilo puede verlo
+    msgs = TeacherMessage.objects.filter(
+        teacher=request.user, student=student
+    ).select_related("sender")
+
+    # Marcar leídos los del estudiante
+    TeacherMessage.objects.filter(
+        teacher=request.user, student=student, sender=student, is_read=False
+    ).update(is_read=True)
+
+    return render(request, "courses/teacher_thread.html", {
+        "active_nav": "teachers",
+        "student":    student,
+        "messages":   msgs,
+    })
+
+
+# ─── MIS DOCUMENTOS ──────────────────────────────────────────────
+
+@login_required
+def my_docs(request, folder_id=None):
+    from courses.models import UserFolder, UserFile, UserNote
+    current = None
+    if folder_id:
+        current = get_object_or_404(UserFolder, pk=folder_id, user=request.user)
+
+    subfolders = UserFolder.objects.filter(user=request.user, parent=current).order_by('name')
+    files      = UserFile.objects.filter(user=request.user, folder=current) if current else []
+    notes      = UserNote.objects.filter(user=request.user, folder=current) if current else []
+    root_folders = UserFolder.objects.filter(user=request.user, parent=None).order_by('name')
+
+    return render(request, 'courses/my_docs.html', {
+        'active_nav':    'my_docs',
+        'current':       current,
+        'subfolders':    subfolders,
+        'files':         files,
+        'notes':         notes,
+        'root_folders':  root_folders,
+        'breadcrumb':    current.breadcrumb() if current else [],
+    })
+
+
+@login_required
+@require_POST
+def my_docs_new_folder(request, folder_id=None):
+    from courses.models import UserFolder
+    name = request.POST.get('name', '').strip()
+    parent = None
+    if folder_id:
+        parent = get_object_or_404(UserFolder, pk=folder_id, user=request.user)
+    if name:
+        UserFolder.objects.get_or_create(user=request.user, parent=parent, name=name)
+    if parent:
+        return redirect('courses:my_docs_folder', folder_id=parent.pk)
+    return redirect('courses:my_docs')
+
+
+@login_required
+@require_POST
+def my_docs_edit_folder(request, folder_id):
+    from courses.models import UserFolder
+    folder = get_object_or_404(UserFolder, pk=folder_id, user=request.user)
+    name = request.POST.get('name', '').strip()
+    if name:
+        folder.name = name
+        folder.save(update_fields=['name'])
+    if folder.parent:
+        return redirect('courses:my_docs_folder', folder_id=folder.parent_id)
+    return redirect('courses:my_docs')
+
+
+@login_required
+@require_POST
+def my_docs_delete_folder(request, folder_id):
+    from courses.models import UserFolder
+    folder = get_object_or_404(UserFolder, pk=folder_id, user=request.user)
+    parent_id = folder.parent_id
+    folder.delete()
+    if parent_id:
+        return redirect('courses:my_docs_folder', folder_id=parent_id)
+    return redirect('courses:my_docs')
+
+
+@login_required
+@require_POST
+def my_docs_upload_file(request, folder_id):
+    from courses.models import UserFolder, UserFile
+    folder = get_object_or_404(UserFolder, pk=folder_id, user=request.user)
+    uploaded = request.FILES.get('file')
+    if uploaded:
+        UserFile.objects.create(
+            folder=folder, user=request.user,
+            name=uploaded.name, file=uploaded,
+        )
+    return redirect('courses:my_docs_folder', folder_id=folder_id)
+
+
+@login_required
+@require_POST
+def my_docs_delete_file(request, file_id):
+    from courses.models import UserFile
+    import os
+    f = get_object_or_404(UserFile, pk=file_id, user=request.user)
+    folder_id = f.folder_id
+    if f.file and os.path.isfile(f.file.path):
+        os.remove(f.file.path)
+    f.delete()
+    return redirect('courses:my_docs_folder', folder_id=folder_id)
+
+
+@login_required
+def my_docs_note_edit(request, folder_id=None, note_id=None):
+    from courses.models import UserFolder, UserNote
+    note   = None
+    folder = None
+
+    if note_id:
+        note   = get_object_or_404(UserNote, pk=note_id, user=request.user)
+        folder = note.folder
+    elif folder_id:
+        folder = get_object_or_404(UserFolder, pk=folder_id, user=request.user)
+
+    if request.method == 'POST':
+        title   = request.POST.get('title', '').strip() or 'Sin título'
+        content = request.POST.get('content', '')
+        if note:
+            note.title   = title
+            note.content = content
+            note.save()
+        else:
+            note = UserNote.objects.create(
+                folder=folder, user=request.user,
+                title=title, content=content,
+            )
+        return redirect('courses:my_docs_folder', folder_id=note.folder_id)
+
+    return render(request, 'courses/my_docs_note.html', {
+        'active_nav': 'my_docs',
+        'note':       note,
+        'folder':     folder,
+    })
+
+
+@login_required
+@require_POST
+def my_docs_note_delete(request, note_id):
+    from courses.models import UserNote
+    note = get_object_or_404(UserNote, pk=note_id, user=request.user)
+    folder_id = note.folder_id
+    note.delete()
+    return redirect('courses:my_docs_folder', folder_id=folder_id)
+
+
+@login_required
+@require_POST
+def my_docs_note_share(request, note_id):
+    import uuid
+    from courses.models import UserNote
+    note   = get_object_or_404(UserNote, pk=note_id, user=request.user)
+    action = request.POST.get('action', 'enable')
+    if action == 'disable':
+        note.share_token = None
+    else:
+        if not note.share_token:
+            note.share_token = uuid.uuid4()
+    note.save(update_fields=['share_token'])
+    return redirect('courses:my_docs_note_edit', note_id=note.pk)
+
+
+def public_note_view(request, token):
+    from courses.models import UserNote
+    note = get_object_or_404(UserNote, share_token=token)
+    return render(request, 'courses/public_note.html', {'note': note})
+
+
+# ─── SUBIDA DE GRABACIÓN DE PANTALLA ─────────────────────────────
+
+@login_required
+@require_POST
+def my_docs_record_upload(request):
+    """Recibe un archivo de grabación de pantalla y lo guarda en Mis documentos."""
+    from courses.models import UserFolder, UserFile
+    from django.utils.timezone import localtime, now
+    import os
+
+    recording = request.FILES.get('recording')
+    if not recording:
+        return JsonResponse({'ok': False, 'error': 'No se recibió ningún archivo.'}, status=400)
+
+    # Carpeta automática "Grabaciones"
+    folder, _ = UserFolder.objects.get_or_create(
+        user=request.user, name='Grabaciones', parent=None
+    )
+
+    timestamp = localtime(now()).strftime('%Y%m%d_%H%M%S')
+    filename  = f'Grabacion_{timestamp}.webm'
+
+    file_obj = UserFile(folder=folder, user=request.user, name=filename)
+    file_obj.file.save(filename, recording, save=True)
+
+    return JsonResponse({'ok': True, 'name': filename})

@@ -1,0 +1,109 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{% if editing %}{{ target.title }}{% else %}Nuevos términos{% endif %} – Nooxial{% endblock %}
+
+{% block topbar %}
+<nav class="flex items-center gap-1.5 text-sm text-gray-400">
+  <a href="{% url 'accounts:admin_terms' %}" class="hover:text-gray-700">Términos y Condiciones</a>
+  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <span class="text-gray-900 font-semibold">{% if editing %}{{ target.title }}{% else %}Nuevos términos{% endif %}</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+{% if messages %}
+<div class="mb-5 space-y-2">
+  {% for msg in messages %}
+  <div class="px-4 py-3 rounded-xl text-sm font-medium
+    {% if msg.tags == 'error' %}bg-red-50 text-red-700{% else %}bg-brand-50 text-brand-700{% endif %}">{{ msg }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<form method="POST">
+{% csrf_token %}
+
+<div class="bg-white rounded-2xl border border-gray-100 max-w-3xl">
+
+  <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+    <div class="flex items-center gap-3">
+      <a href="{% url 'accounts:admin_terms' %}"
+         class="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+      </a>
+      <h1 class="text-lg font-bold text-gray-900">{% if editing %}{{ target.title }}{% else %}Nuevos términos{% endif %}</h1>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="submit" name="action" value="save"
+              class="flex items-center gap-2 text-sm font-bold bg-brand-300 text-gray-900 px-4 py-2 rounded-xl hover:bg-brand-400 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+        </svg>
+        Guardar
+      </button>
+      {% if editing %}
+      <button type="submit" name="action" value="delete"
+              onclick="return confirm('¿Eliminar estos términos? Las aceptaciones registradas también se eliminarán.')"
+              class="flex items-center gap-2 text-sm font-semibold text-red-600 border border-red-200 px-4 py-2 rounded-xl hover:bg-red-50 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+        </svg>
+        Eliminar
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="p-6 space-y-5">
+
+    <div class="grid grid-cols-3 gap-4">
+      <div class="col-span-2">
+        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Título</label>
+        <input type="text" name="title" value="{{ target.title|default:'Términos y Condiciones' }}" required
+               class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Versión</label>
+        <input type="text" name="version" value="{{ target.version|default:'' }}" placeholder="1.0"
+               class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+        Contenido <span class="text-red-400">*</span>
+      </label>
+      <textarea name="description" rows="18" required
+                placeholder="Escribe aquí los términos y condiciones…"
+                class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-mono leading-relaxed
+                       focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition resize-y">{{ target.description|default:'' }}</textarea>
+    </div>
+
+    <div class="flex items-center justify-between py-3 border-t border-gray-100">
+      <div>
+        <p class="text-sm font-semibold text-gray-800">Activar y requerir aceptación</p>
+        <p class="text-xs text-gray-400 mt-0.5">Todos los usuarios deberán aceptar estos términos antes de acceder. Solo puede haber uno activo a la vez.</p>
+      </div>
+      <div class="relative ml-4">
+        <input type="checkbox" name="is_active" id="tog-active"
+               {% if target.is_active or not editing %}checked{% endif %} class="sr-only peer" />
+        <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-green-500 transition-colors cursor-pointer"
+             onclick="document.getElementById('tog-active').click()"></div>
+        <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5 pointer-events-none"></div>
+      </div>
+    </div>
+
+    {% if editing %}
+    <div class="border-t border-gray-100 pt-4">
+      <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Estadísticas</p>
+      <p class="text-sm text-gray-600">{{ target.acceptances.count }} usuario{{ target.acceptances.count|pluralize:"s" }} han aceptado estos términos.</p>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+</form>
+{% endblock %}

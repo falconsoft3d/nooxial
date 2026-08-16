@@ -41,7 +41,82 @@
 </head>
 <body class="font-sans bg-white text-gray-900 antialiased">
 
+  <!-- ─── NAVBAR PÚBLICO (heredado por todas las páginas públicas) ─ -->
+  {% block navbar %}
+  <header class="sticky top-0 z-50 bg-white border-b border-gray-100">
+    <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-2">
+        <span class="text-2xl font-black text-gray-900 tracking-tight">
+          <span class="text-brand-400">N</span>ooxial
+        </span>
+      </a>
+      <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
+        <a href="/#cursos" class="hover:text-gray-900 transition-colors">Cursos</a>
+        <a href="/#categorias" class="hover:text-gray-900 transition-colors">Categorías</a>
+        <a href="/blog/" class="hover:text-gray-900 transition-colors">Blog</a>
+        <a href="/talento/" class="hover:text-gray-900 transition-colors">Talento</a>
+        <a href="/#nosotros" class="hover:text-gray-900 transition-colors">Nosotros</a>
+      </nav>
+      <div class="flex items-center gap-3">
+        {% if user.is_authenticated %}
+        <span class="hidden sm:block text-sm text-gray-600">Hola, <strong>{{ user.first_name|default:user.username }}</strong></span>
+        <a href="{% url 'courses:dashboard' %}"
+           class="bg-gray-900 text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-gray-700 transition-colors">
+          Ir al Dashboard
+        </a>
+        {% else %}
+        <a href="{% url 'accounts:login' %}"
+           class="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors px-4 py-2">
+          Inicia sesión
+        </a>
+        <a href="{% url 'accounts:register' %}"
+           class="bg-gray-900 text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-gray-700 transition-colors">
+          Regístrate
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+  {% endblock navbar %}
+
   {% block body %}{% endblock %}
+
+  <!-- ─── FOOTER PÚBLICO ──────────────────────────────────────── -->
+  {% block footer %}
+  <footer class="bg-gray-900 border-t border-white/10 py-12 px-6 text-gray-400">
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between gap-8">
+      <div>
+        <span class="text-xl font-black text-white">
+          <span class="text-brand-300">N</span>ooxial
+        </span>
+        <p class="mt-2 text-sm max-w-xs">
+          La plataforma de aprendizaje online para estudiantes que quieren crecer.
+        </p>
+      </div>
+      <div class="flex gap-16 text-sm">
+        <div>
+          <p class="text-white font-semibold mb-3">Producto</p>
+          <ul class="space-y-2">
+            <li><a href="/dashboard/cursos/" class="hover:text-white transition-colors">Cursos</a></li>
+            <li><a href="/#categorias" class="hover:text-white transition-colors">Categorías</a></li>
+            <li><a href="/talento/" class="hover:text-white transition-colors">Talento</a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="text-white font-semibold mb-3">Empresa</p>
+          <ul class="space-y-2">
+            <li><a href="/#nosotros" class="hover:text-white transition-colors">Nosotros</a></li>
+            <li><a href="/blog/" class="hover:text-white transition-colors">Blog</a></li>
+            <li><a href="/#contacto" class="hover:text-white transition-colors">Contacto</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="max-w-6xl mx-auto mt-10 pt-6 border-t border-white/10 text-xs text-center">
+      © {% now "Y" %} Nooxial. Todos los derechos reservados.
+    </div>
+  </footer>
+  {% endblock footer %}
 
   {% block extra_scripts %}{% endblock %}
 
@@ -140,6 +215,53 @@
 
   // Polling cada 15s si el panel está abierto
   setInterval(() => { if (supportOpen) loadSupportMsgs(); }, 15000);
+  </script>
+  {% endif %}
+
+  {% if site_config.cookie_consent_enabled %}
+  <!-- ─── BANNER DE COOKIES ──────────────────────────────── -->
+  <div id="cookie-banner"
+       class="fixed bottom-0 left-0 right-0 z-[9999] bg-gray-900 text-white shadow-2xl
+              transition-transform duration-500 translate-y-full"
+       style="display:none;">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+      <div class="flex items-start gap-3 flex-1">
+        <svg class="w-5 h-5 text-brand-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <p class="text-sm text-gray-300 leading-relaxed">
+          {{ site_config.cookie_consent_text }}
+        </p>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <button onclick="cookieAccept('necessary')"
+                class="text-xs font-semibold text-gray-400 hover:text-white transition-colors px-3 py-2 rounded-xl hover:bg-white/10">
+          Solo necesarias
+        </button>
+        <button onclick="cookieAccept('all')"
+                class="bg-brand-400 text-gray-900 font-bold text-sm px-5 py-2 rounded-full
+                       hover:bg-brand-300 active:bg-brand-500 transition-colors">
+          Aceptar todas
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function() {
+    var COOKIE_KEY = 'nooxial_cookie_consent';
+    var banner = document.getElementById('cookie-banner');
+    if (!localStorage.getItem(COOKIE_KEY)) {
+      banner.style.display = 'block';
+      setTimeout(function() { banner.classList.remove('translate-y-full'); }, 200);
+    }
+    window.cookieAccept = function(level) {
+      localStorage.setItem(COOKIE_KEY, level);
+      banner.classList.add('translate-y-full');
+      setTimeout(function() { banner.style.display = 'none'; }, 500);
+    };
+  })();
   </script>
   {% endif %}
 </body>

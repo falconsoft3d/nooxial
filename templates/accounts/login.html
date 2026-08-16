@@ -2,6 +2,8 @@
 
 {% block title %}Inicia sesión – Nooxial{% endblock %}
 
+{% block navbar %}{% endblock %}
+{% block footer %}{% endblock %}
 {% block body %}
 <div class="min-h-screen bg-gray-50 flex flex-col">
 
@@ -57,6 +59,7 @@
             type="text"
             id="username"
             name="username"
+            value="{{ saved_username }}"
             placeholder="correo@ejemplo.com"
             autocomplete="email"
             required
@@ -92,12 +95,27 @@
           </div>
         </div>
 
+        <!-- Recordar sesión + olvidé contraseña -->
+        <div class="flex items-center justify-between">
+          <label class="flex items-center gap-2.5 cursor-pointer select-none group">
+            <input type="checkbox" name="remember_me" id="remember_me"
+                   class="w-4 h-4 rounded border-gray-300 accent-[#9fe870] cursor-pointer"
+                   {% if remember_me %}checked{% endif %}>
+            <span class="text-sm text-gray-600 group-hover:text-gray-800 transition-colors">Recordar sesión</span>
+          </label>
+          <a href="{% url 'accounts:forgot_password' %}" class="text-sm text-gray-500 hover:text-brand-600 underline underline-offset-4 transition-colors">
+            ¿Olvidaste tu contraseña?
+          </a>
+        </div>
+
         <button type="submit"
                 class="w-full bg-brand-300 text-gray-900 font-bold text-base py-4 rounded-full
                        hover:bg-brand-400 active:bg-brand-500 transition-colors">
           Iniciar sesión
         </button>
       </form>
+
+
 
     </div>
   </main>

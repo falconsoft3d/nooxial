@@ -1,0 +1,109 @@
+<!-- ─── NAVBAR COMPARTIDO ─────────────────────────────────────── -->
+<header class="sticky top-0 z-50 bg-white border-b border-gray-100">
+  <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
+
+    <!-- Logo -->
+    <a href="/" class="flex items-center gap-2 flex-shrink-0">
+      <span class="text-2xl font-black text-gray-900 tracking-tight">
+        <span class="text-brand-400">N</span>ooxial
+      </span>
+    </a>
+
+    <!-- Nav links opcionales (home) -->
+    {% if show_home_nav %}
+    <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
+      <a href="#cursos"     class="hover:text-gray-900 transition-colors">Cursos</a>
+      <a href="#categorias" class="hover:text-gray-900 transition-colors">Categorías</a>
+      <a href="/blog/"      class="hover:text-gray-900 transition-colors">Blog</a>
+    </nav>
+    {% endif %}
+
+    <!-- Derecha -->
+    <div class="flex items-center gap-2 ml-auto">
+
+      {% if user.is_authenticated %}
+
+        <!-- Dropdown Mis cursos -->
+        {% if nav_my_courses %}
+        <div class="relative" id="mycourses-wrapper">
+          <button id="mycourses-btn" type="button"
+                  onclick="toggleMyCourses()"
+                  class="hidden sm:flex items-center gap-1.5 text-sm font-semibold text-gray-700
+                         px-4 py-2 rounded-full hover:bg-gray-100 transition-colors">
+            <svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+            </svg>
+            Mis cursos
+            <svg id="mycourses-chevron" class="w-3.5 h-3.5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+
+          <!-- Dropdown panel -->
+          <div id="mycourses-panel"
+               class="hidden absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50">
+            <div class="px-4 py-3 border-b border-gray-50">
+              <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Mis cursos</p>
+            </div>
+            <ul class="py-2 max-h-80 overflow-y-auto">
+              {% for c in nav_my_courses %}
+              <li>
+                <a href="{% url 'courses:course_detail' c.slug %}"
+                   class="flex items-center gap-3 px-4 py-2.5 hover:bg-brand-50 transition-colors group">
+                  <span class="text-xl w-8 text-center flex-shrink-0">{{ c.emoji|default:"📚" }}</span>
+                  <span class="text-sm font-medium text-gray-800 group-hover:text-gray-900 leading-tight line-clamp-2">
+                    {{ c.title }}
+                  </span>
+                </a>
+              </li>
+              {% endfor %}
+            </ul>
+            <div class="px-4 py-3 border-t border-gray-50">
+              <a href="{% url 'courses:my_courses' %}"
+                 class="text-xs font-semibold text-brand-600 hover:text-brand-800 transition-colors">
+                Ver todos mis cursos →
+              </a>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <span class="hidden sm:block text-sm text-gray-600 px-1">{{ user.first_name|default:user.username }}</span>
+        <a href="{% url 'courses:dashboard' %}"
+           class="bg-gray-900 text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-gray-700 transition-colors">
+          Dashboard
+        </a>
+
+      {% else %}
+        <a href="{% url 'accounts:login' %}"
+           class="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors px-4 py-2">
+          Inicia sesión
+        </a>
+        <a href="{% url 'accounts:register' %}"
+           class="bg-gray-900 text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-gray-700 transition-colors">
+          Regístrate
+        </a>
+      {% endif %}
+
+    </div>
+  </div>
+</header>
+
+<script>
+(function () {
+  var open = false;
+  window.toggleMyCourses = function () {
+    open = !open;
+    document.getElementById('mycourses-panel').classList.toggle('hidden', !open);
+    document.getElementById('mycourses-chevron').classList.toggle('rotate-180', open);
+  };
+  document.addEventListener('click', function (e) {
+    if (open && !document.getElementById('mycourses-wrapper').contains(e.target)) {
+      open = false;
+      document.getElementById('mycourses-panel').classList.add('hidden');
+      document.getElementById('mycourses-chevron').classList.remove('rotate-180');
+    }
+  });
+})();
+</script>

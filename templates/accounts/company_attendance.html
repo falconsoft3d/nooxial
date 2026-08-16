@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Registro de asistencia – {{ company.name }}{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-gray-50 flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-100">
+    <div class="max-w-2xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="/" class="text-xl font-black tracking-tight text-gray-900">
+          <span class="text-brand-400">N</span>ooxial
+        </a>
+        <span class="text-gray-300">|</span>
+        <span class="text-sm font-semibold text-gray-700">{{ company.name }}</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 flex items-start justify-center pt-12 pb-20 px-4">
+    <div class="w-full max-w-md">
+
+      {% if submitted %}
+      <!-- Confirmación -->
+      <div class="bg-white rounded-3xl border border-gray-100 p-10 text-center shadow-sm">
+        <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
+          <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+          </svg>
+        </div>
+        <h1 class="text-2xl font-black text-gray-900 mb-2">¡Asistencia registrada!</h1>
+        <p class="text-gray-500">Tu presencia ha sido confirmada correctamente en <strong>{{ company.name }}</strong>.</p>
+        <button onclick="window.location.reload()"
+                class="mt-6 bg-gray-900 text-white font-bold px-8 py-3 rounded-full hover:bg-gray-700 transition-colors text-sm">
+          Registrar otra persona
+        </button>
+      </div>
+
+      {% else %}
+      <!-- Formulario -->
+      <div class="text-center mb-8">
+        <div class="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <svg class="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+          </svg>
+        </div>
+        <h1 class="text-2xl font-black text-gray-900">Registro de asistencia</h1>
+        <p class="text-gray-500 mt-1 text-sm">{{ company.name }}</p>
+      </div>
+
+      {% if errors %}
+      <div class="mb-5 space-y-2">
+        {% for err in errors %}
+        <div class="px-4 py-3 rounded-xl text-sm text-red-700 bg-red-50 border border-red-200">{{ err }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
+        <form method="POST" class="space-y-4">
+          {% csrf_token %}
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="col-span-2">
+              <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                Nombre completo <span class="text-red-400">*</span>
+              </label>
+              <input type="text" name="name" required autofocus placeholder="Juan García"
+                     class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm
+                            focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Email</label>
+              <input type="email" name="email" placeholder="correo@ejemplo.com"
+                     class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm
+                            focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Teléfono</label>
+              <input type="tel" name="phone" placeholder="+34 600 000 000"
+                     class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm
+                            focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+            </div>
+
+            <div class="col-span-2">
+              <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Cargo</label>
+              <input type="text" name="position" placeholder="CEO, Manager, Estudiante…"
+                     class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm
+                            focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+            </div>
+
+            <div class="col-span-2">
+              <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Notas</label>
+              <textarea name="notes" rows="3" placeholder="Comentarios adicionales…"
+                        class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none
+                               focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition"></textarea>
+            </div>
+          </div>
+
+          <button type="submit"
+                  class="w-full bg-gray-900 text-white font-black py-4 rounded-full
+                         hover:bg-gray-700 active:bg-gray-800 transition-colors mt-2">
+            Confirmar asistencia
+          </button>
+        </form>
+      </div>
+      {% endif %}
+
+    </div>
+  </main>
+
+  <footer class="py-6 text-center text-xs text-gray-400 border-t border-gray-100">
+    Registro de asistencia generado por <strong class="text-gray-600">Nooxial</strong>
+  </footer>
+</div>
+{% endblock %}

@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}Pantalla bloqueada – Nooxial{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-gray-900 flex items-center justify-center px-4">
+  <div class="w-full max-w-sm">
+
+    <!-- Avatar -->
+    <div class="flex flex-col items-center mb-8">
+      {% if profile.photo %}
+      <img src="{{ profile.photo.url }}" alt="Foto"
+           class="w-20 h-20 rounded-full object-cover ring-4 ring-white/20 mb-4">
+      {% else %}
+      <div class="w-20 h-20 rounded-full bg-brand-400 flex items-center justify-center text-2xl font-black text-gray-900 ring-4 ring-white/20 mb-4">
+        {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
+      </div>
+      {% endif %}
+      <p class="text-white font-bold text-xl">{{ request.user.get_full_name|default:request.user.username }}</p>
+      <p class="text-gray-400 text-sm mt-0.5">@{{ request.user.username }}</p>
+    </div>
+
+    <!-- Tarjeta -->
+    <div class="bg-white rounded-3xl p-8 shadow-2xl">
+
+      {% if error %}
+      <div class="mb-5 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 text-center">
+        {{ error }}
+      </div>
+      {% endif %}
+
+      {% if profile.has_pin %}
+      <!-- ── Formulario de desbloqueo ── -->
+      <div class="text-center mb-6">
+        <div class="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+          <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+        </div>
+        <h1 class="text-lg font-bold text-gray-900">Pantalla bloqueada</h1>
+        <p class="text-sm text-gray-400 mt-1">Introduce tu PIN de 4 dígitos para continuar</p>
+      </div>
+
+      <form method="POST" action="{% url 'accounts:lock_screen' %}" id="unlock-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="unlock">
+
+        <!-- PIN display + input oculto -->
+        <div class="flex justify-center gap-3 mb-6">
+          {% for i in "1234" %}
+          <div id="pin-dot-{{ i }}"
+               class="w-14 h-14 rounded-2xl border-2 border-gray-200 flex items-center justify-center text-2xl font-black text-gray-900 transition-all">
+          </div>
+          {% endfor %}
+        </div>
+        <input type="password" name="pin" id="pin-input" maxlength="4" inputmode="numeric"
+               class="sr-only" autocomplete="off" autofocus>
+
+        <!-- Teclado numérico -->
+        <div class="grid grid-cols-3 gap-3 mb-4">
+          {% for d in "123456789" %}
+          <button type="button" onclick="pinKey('{{ d }}')"
+                  class="h-14 rounded-2xl bg-gray-50 hover:bg-brand-50 hover:border-brand-300 border border-gray-200
+                         text-xl font-bold text-gray-800 transition-colors active:scale-95">
+            {{ d }}
+          </button>
+          {% endfor %}
+          <button type="button" onclick="pinClear()"
+                  class="h-14 rounded-2xl bg-gray-50 hover:bg-red-50 hover:border-red-200 border border-gray-200
+                         text-sm font-semibold text-gray-500 transition-colors active:scale-95">
+            Borrar
+          </button>
+          <button type="button" onclick="pinKey('0')"
+                  class="h-14 rounded-2xl bg-gray-50 hover:bg-brand-50 hover:border-brand-300 border border-gray-200
+                         text-xl font-bold text-gray-800 transition-colors active:scale-95">
+            0
+          </button>
+          <button type="submit"
+                  class="h-14 rounded-2xl bg-gray-900 hover:bg-gray-700 text-white text-sm font-bold transition-colors active:scale-95">
+            OK
+          </button>
+        </div>
+      </form>
+
+      <div class="text-center mt-2">
+        <a href="{% url 'accounts:logout' %}"
+           class="text-xs text-gray-400 hover:text-gray-600 transition-colors underline underline-offset-2">
+          Cerrar sesión
+        </a>
+      </div>
+
+      {% else %}
+      <!-- ── Sin PIN: formulario de creación ── -->
+      <div class="text-center mb-6">
+        <div class="w-12 h-12 bg-brand-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+          <svg class="w-6 h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+          </svg>
+        </div>
+        <h1 class="text-lg font-bold text-gray-900">Crea tu PIN de bloqueo</h1>
+        <p class="text-sm text-gray-400 mt-1">Define un PIN de 4 dígitos para proteger tu sesión</p>
+      </div>
+
+      <form method="POST" action="{% url 'accounts:lock_screen' %}" class="space-y-4">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="set_pin">
+
+        <div>
+          <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+            Nuevo PIN (4 dígitos)
+          </label>
+          <input type="password" name="pin1" maxlength="4" inputmode="numeric"
+                 placeholder="••••" autocomplete="new-password" required autofocus
+                 class="w-full border border-gray-200 rounded-xl px-4 py-3 text-center text-2xl tracking-[0.5em]
+                        focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+            Confirmar PIN
+          </label>
+          <input type="password" name="pin2" maxlength="4" inputmode="numeric"
+                 placeholder="••••" autocomplete="new-password" required
+                 class="w-full border border-gray-200 rounded-xl px-4 py-3 text-center text-2xl tracking-[0.5em]
+                        focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent transition" />
+        </div>
+        <button type="submit"
+                class="w-full bg-gray-900 text-white font-bold py-3.5 rounded-full
+                       hover:bg-gray-700 transition-colors mt-2">
+          Guardar PIN
+        </button>
+      </form>
+
+      <div class="text-center mt-4">
+        <a href="{% url 'accounts:logout' %}"
+           class="text-xs text-gray-400 hover:text-gray-600 transition-colors underline underline-offset-2">
+          Cerrar sesión sin configurar PIN
+        </a>
+      </div>
+      {% endif %}
+
+    </div>
+
+  </div>
+</div>
+
+{% block extra_scripts %}
+<script>
+var _pin = '';
+function pinKey(d) {
+  if (_pin.length >= 4) return;
+  _pin += d;
+  updateDots();
+  if (_pin.length === 4) {
+    document.getElementById('pin-input').value = _pin;
+    setTimeout(function(){ document.getElementById('unlock-form').submit(); }, 120);
+  }
+}
+function pinClear() {
+  _pin = _pin.slice(0, -1);
+  updateDots();
+  document.getElementById('pin-input').value = _pin;
+}
+function updateDots() {
+  for (var i = 1; i <= 4; i++) {
+    var el = document.getElementById('pin-dot-' + i);
+    if (i <= _pin.length) {
+      el.textContent = '●';
+      el.classList.add('border-brand-400', 'bg-brand-50');
+      el.classList.remove('border-gray-200');
+    } else {
+      el.textContent = '';
+      el.classList.remove('border-brand-400', 'bg-brand-50');
+      el.classList.add('border-gray-200');
+    }
+  }
+}
+// Teclado físico
+document.addEventListener('keydown', function(e) {
+  if (e.key >= '0' && e.key <= '9') pinKey(e.key);
+  if (e.key === 'Backspace') pinClear();
+});
+</script>
+{% endblock %}
+{% endblock %}

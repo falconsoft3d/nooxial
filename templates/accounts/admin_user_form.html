@@ -234,6 +234,33 @@
         </div>
         {% endif %}
 
+        <!-- Empresa -->
+        <div class="border-t border-gray-100 pt-4">
+          <label class="odoo-label">Empresa <span class="text-gray-300 font-normal normal-case">(opcional)</span></label>
+          <div class="relative">
+            <select name="company"
+                    class="odoo-input appearance-none pr-8">
+              <option value="">— Sin empresa —</option>
+              {% for c in companies %}
+              <option value="{{ c.pk }}"
+                {% if editing and target.profile.company_id == c.pk %}selected{% endif %}>
+                {{ c.name }}
+              </option>
+              {% endfor %}
+            </select>
+            <svg class="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </div>
+          {% if companies|length == 0 %}
+          <p class="text-xs text-gray-400 mt-1">
+            No hay empresas creadas.
+            <a href="{% url 'accounts:admin_company_new' %}" class="text-brand-600 underline">Crear una</a>
+          </p>
+          {% endif %}
+        </div>
+
       </div>
     </div>
   </div>

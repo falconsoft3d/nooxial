@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q, Count
 from django.core.paginator import Paginator
+from django.http import JsonResponse
 from django.utils import timezone
 from datetime import timedelta
 from functools import wraps
@@ -20,7 +21,7 @@ def staff_required(view_func):
             return redirect('courses:dashboard')
         return view_func(request, *args, **kwargs)
     return wrapper
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 
 
 @require_http_methods(['GET', 'POST'])
@@ -28,15 +29,19 @@ def login_view(request):
     if request.user.is_authenticated:
         return redirect('courses:dashboard')
 
+    saved_username = request.COOKIES.get('nooxial_remember_user', '')
+    remember_me    = bool(saved_username)
+
     if request.method == 'POST':
-        credential = request.POST.get('username', '').strip()
-        password   = request.POST.get('password', '')
+        credential  = request.POST.get('username', '').strip()
+        password    = request.POST.get('password', '')
+        remember_me = request.POST.get('remember_me') == 'on'
 
         # Buscar por email primero si contiene '@'
         if '@' in credential:
             try:
-                user_obj   = User.objects.get(email__iexact=credential)
-                username   = user_obj.username
+                user_obj = User.objects.get(email__iexact=credential)
+                username = user_obj.username
             except User.DoesNotExist:
                 username = credential
         else:
@@ -50,11 +55,30 @@ def login_view(request):
 
         if user is not None:
             login(request, user)
+            if remember_me:
+                # Sesión dura 30 días
+                request.session.set_expiry(30 * 24 * 60 * 60)
+            else:
+                # Sesión expira al cerrar el navegador
+                request.session.set_expiry(0)
             next_url = request.GET.get('next', 'courses:dashboard')
-            return redirect(next_url)
+            response = redirect(next_url)
+            if remember_me:
+                # Guardar usuario en cookie (30 días)
+                response.set_cookie(
+                    'nooxial_remember_user', credential,
+                    max_age=30 * 24 * 60 * 60,
+                    httponly=True, samesite='Lax',
+                )
+            else:
+                response.delete_cookie('nooxial_remember_user')
+            return response
         messages.error(request, 'Correo/usuario o contraseña incorrectos.')
 
-    return render(request, 'accounts/login.html')
+    return render(request, 'accounts/login.html', {
+        'saved_username': saved_username,
+        'remember_me':    remember_me,
+    })
 
 
 @require_http_methods(['GET', 'POST'])
@@ -90,6 +114,8 @@ def register_view(request):
                 first_name=first_name,
                 last_name=last_name,
             )
+            # Enviar email de bienvenida si está activado
+            _send_welcome_email(user)
             login(request, user)
             return redirect('courses:dashboard')
 
@@ -165,6 +191,17 @@ def profile_view(request):
             else:
                 messages.error(request, 'Selecciona una imagen.')
 
+        elif form_type == 'cv':
+            profile.cv_headline   = request.POST.get('cv_headline', '').strip()
+            profile.cv_summary    = request.POST.get('cv_summary', '').strip()
+            profile.cv_experience = request.POST.get('cv_experience', '').strip()
+            profile.cv_education  = request.POST.get('cv_education', '').strip()
+            profile.cv_skills     = request.POST.get('cv_skills', '').strip()
+            profile.cv_public     = request.POST.get('cv_public') == '1'
+            profile.save(update_fields=['cv_headline','cv_summary','cv_experience',
+                                        'cv_education','cv_skills','cv_public'])
+            messages.success(request, 'Currículum actualizado.')
+
         return redirect('accounts:profile')
 
     return render(request, 'accounts/profile.html', {
@@ -211,7 +248,7 @@ def admin_users(request):
     q      = request.GET.get('q', '').strip()
     filter = request.GET.get('filter', 'all')
 
-    qs = User.objects.annotate(course_count=Count('enrollments')).order_by('-date_joined')
+    qs = User.objects.annotate(course_count=Count('enrollments')).select_related('profile__company').order_by('-date_joined')
 
     if q:
         qs = qs.filter(Q(username__icontains=q) | Q(email__icontains=q) |
@@ -252,8 +289,10 @@ def admin_users(request):
 @staff_required
 @require_http_methods(['GET', 'POST'])
 def admin_user_form(request, user_id=None):
-    editing = user_id is not None
-    target  = get_object_or_404(User, pk=user_id) if editing else None
+    from accounts.models import Company
+    editing  = user_id is not None
+    target   = get_object_or_404(User, pk=user_id) if editing else None
+    companies = Company.objects.order_by('name')
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -296,6 +335,12 @@ def admin_user_form(request, user_id=None):
                 if password:
                     target.set_password(password)
                 target.save()
+                # Empresa
+                company_id = request.POST.get('company') or None
+                from accounts.models import Company
+                profile, _ = target.profile.__class__.objects.get_or_create(user=target)
+                profile.company = Company.objects.filter(pk=company_id).first() if company_id else None
+                profile.save()
                 messages.success(request, 'Usuario actualizado correctamente.')
                 return redirect('accounts:admin_user_edit', user_id=target.pk)
             else:
@@ -303,6 +348,7 @@ def admin_user_form(request, user_id=None):
                     messages.error(request, 'La contraseña es obligatoria para usuarios nuevos.')
                     return render(request, 'accounts/admin_user_form.html', {
                         'active_nav': 'admin_users', 'editing': False, 'target': None,
+                        'companies': companies,
                     })
                 new_user = User.objects.create_user(
                     username=username, email=email, password=password,
@@ -312,6 +358,12 @@ def admin_user_form(request, user_id=None):
                 new_user.is_staff     = is_staff
                 new_user.is_superuser = is_super
                 new_user.save()
+                # Empresa
+                company_id = request.POST.get('company') or None
+                from accounts.models import Company
+                profile, _ = new_user.profile.__class__.objects.get_or_create(user=new_user)
+                profile.company = Company.objects.filter(pk=company_id).first() if company_id else None
+                profile.save()
                 messages.success(request, f'Usuario "{new_user.username}" creado correctamente.')
                 return redirect('accounts:admin_user_edit', user_id=new_user.pk)
 
@@ -319,6 +371,349 @@ def admin_user_form(request, user_id=None):
         'active_nav': 'admin_users',
         'editing':    editing,
         'target':     target,
+        'companies':  companies,
+    })
+
+
+# ─── ADMIN: EMPRESAS ─────────────────────────────────────────────
+
+@staff_required
+def admin_companies(request):
+    from accounts.models import Company
+    q  = request.GET.get('q', '').strip()
+    qs = Company.objects.order_by('name')
+    if q:
+        qs = qs.filter(name__icontains=q)
+    paginator = Paginator(qs, 20)
+    page      = paginator.get_page(request.GET.get('page', 1))
+    return render(request, 'accounts/admin_companies.html', {
+        'active_nav': 'admin_companies',
+        'page_obj':   page,
+        'q':          q,
+        'total':      qs.count(),
+    })
+
+
+@staff_required
+@require_http_methods(['GET', 'POST'])
+def admin_company_form(request, company_id=None):
+    from accounts.models import Company
+    editing = company_id is not None
+    target  = get_object_or_404(Company, pk=company_id) if editing else None
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'delete' and editing:
+            name = target.name
+            target.delete()
+            messages.success(request, f'Empresa "{name}" eliminada.')
+            return redirect('accounts:admin_companies')
+
+        name    = request.POST.get('name', '').strip()
+        email   = request.POST.get('email', '').strip()
+        phone   = request.POST.get('phone', '').strip()
+        web     = request.POST.get('web', '').strip()
+        address = request.POST.get('address', '').strip()
+        nif     = request.POST.get('nif', '').strip()
+
+        if not name:
+            messages.error(request, 'El nombre de la empresa es obligatorio.')
+        else:
+            if editing:
+                target.name    = name
+                target.email   = email
+                target.phone   = phone
+                target.web     = web
+                target.address = address
+                target.nif     = nif
+                target.save()
+                messages.success(request, 'Empresa actualizada correctamente.')
+                return redirect('accounts:admin_company_edit', company_id=target.pk)
+            else:
+                company = Company.objects.create(
+                    name=name, email=email, phone=phone,
+                    web=web, address=address, nif=nif,
+                )
+                messages.success(request, f'Empresa "{company.name}" creada correctamente.')
+                return redirect('accounts:admin_company_edit', company_id=company.pk)
+
+    from courses.models import TrainingPlan
+    training_plans = TrainingPlan.objects.all().order_by('name') if editing else []
+    return render(request, 'accounts/admin_company_form.html', {
+        'active_nav': 'admin_companies',
+        'editing':    editing,
+        'target':     target,
+        'training_plans': training_plans,
+        'attendances': target.attendances.order_by('-created_at') if editing else [],
+    })
+
+
+# ─── DASHBOARD PÚBLICO DE EMPRESA ────────────────────────────────
+
+@require_http_methods(['GET', 'POST'])
+def company_register(request, token):
+    """Registro de usuario vinculado a una empresa mediante token."""
+    from accounts.models import Company, UserProfile
+    company = get_object_or_404(Company, public_token=token)
+
+    if request.user.is_authenticated:
+        # Si ya está autenticado, asignarlo a la empresa si no tiene
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        if profile.company is None:
+            profile.company = company
+            profile.save(update_fields=['company'])
+        return redirect('accounts:company_dashboard', token=token)
+
+    reg_errors = []
+    reg_data   = {}
+
+    if request.method == 'POST':
+        first_name = request.POST.get('first_name', '').strip()
+        last_name  = request.POST.get('last_name', '').strip()
+        email      = request.POST.get('email', '').strip()
+        username   = request.POST.get('username', '').strip()
+        password1  = request.POST.get('password1', '')
+        password2  = request.POST.get('password2', '')
+        reg_data   = {'first_name': first_name, 'last_name': last_name,
+                      'email': email, 'username': username}
+
+        if password1 != password2:
+            reg_errors.append('Las contraseñas no coinciden.')
+        elif User.objects.filter(username=username).exists():
+            reg_errors.append('Ese nombre de usuario ya está en uso.')
+        elif email and User.objects.filter(email=email).exists():
+            reg_errors.append('Ya existe una cuenta con ese correo.')
+        elif len(password1) < 8:
+            reg_errors.append('La contraseña debe tener al menos 8 caracteres.')
+        elif not username:
+            reg_errors.append('El nombre de usuario es obligatorio.')
+        else:
+            new_user = User.objects.create_user(
+                username=username, email=email, password=password1,
+                first_name=first_name, last_name=last_name,
+            )
+            # Login PRIMERO — dispara update_last_login → user.save() → signal
+            # que guardará el perfil sin empresa (aún no asignada).
+            # Luego asignamos empresa en un save separado, que ya no será sobreescrito.
+            _send_welcome_email(new_user)
+            login(request, new_user)
+            # Asignar empresa DESPUÉS de login para evitar que el signal la sobreescriba
+            profile, _ = UserProfile.objects.get_or_create(user=new_user)
+            profile.company = company
+            profile.save(update_fields=['company'])
+            return redirect('accounts:company_dashboard', token=token)
+
+    # GET o errores: renderizar el dashboard con el formulario
+    return _render_company_dashboard(request, company, reg_errors=reg_errors, reg_data=reg_data)
+
+
+def _render_company_dashboard(request, company, reg_errors=None, reg_data=None):
+    """Renderiza el dashboard de empresa, reutilizado por company_dashboard y company_register."""
+    from courses.models import (
+        Enrollment, LessonProgress, ExamAttempt, TaskSubmission
+    )
+    from django.db.models import Count, Avg
+    from django.utils import timezone
+    from datetime import timedelta
+
+    profiles    = company.users.select_related('user').all()
+    students    = [p.user for p in profiles]
+    student_ids = [u.pk for u in students]
+
+    kpis     = {}
+    rankings = {}
+    student_stats = []
+
+    if student_ids:
+        total_enrollments  = Enrollment.objects.filter(student_id__in=student_ids).count()
+        completed_courses  = Enrollment.objects.filter(student_id__in=student_ids, progress=100).count()
+        total_lessons_done = LessonProgress.objects.filter(student_id__in=student_ids).count()
+        exams_passed       = ExamAttempt.objects.filter(student_id__in=student_ids, passed=True).count()
+        exams_total        = ExamAttempt.objects.filter(student_id__in=student_ids).count()
+        tasks_submitted    = TaskSubmission.objects.filter(student_id__in=student_ids).count()
+        avg_progress       = Enrollment.objects.filter(student_id__in=student_ids).aggregate(avg=Avg('progress'))['avg'] or 0
+        avg_exam_score     = ExamAttempt.objects.filter(student_id__in=student_ids).aggregate(avg=Avg('score'))['avg'] or 0
+        active_30d         = User.objects.filter(
+            pk__in=student_ids,
+            last_login__gte=timezone.now() - timedelta(days=30)
+        ).count()
+
+        kpis = {
+            'total_students':     len(students),
+            'active_30d':         active_30d,
+            'total_enrollments':  total_enrollments,
+            'completed_courses':  completed_courses,
+            'total_lessons_done': total_lessons_done,
+            'exams_passed':       exams_passed,
+            'exam_pass_rate':     round(exams_passed / exams_total * 100) if exams_total else 0,
+            'tasks_submitted':    tasks_submitted,
+            'avg_progress':       round(avg_progress, 1),
+            'avg_exam_score':     round(avg_exam_score, 1),
+        }
+
+        user_map = {u.pk: u for u in students}
+
+        def enrich(qs, extra_keys=None):
+            result = []
+            for row in qs:
+                u = user_map.get(row['student_id'])
+                if u:
+                    entry = {'user': u, 'total': row['total']}
+                    if extra_keys:
+                        for k in extra_keys:
+                            entry[k] = row.get(k)
+                    result.append(entry)
+            return result
+
+        rankings = {
+            'lessons': enrich(
+                LessonProgress.objects.filter(student_id__in=student_ids)
+                .values('student_id').annotate(total=Count('id')).order_by('-total')[:10]
+            ),
+            'courses': enrich(
+                Enrollment.objects.filter(student_id__in=student_ids, progress=100)
+                .values('student_id').annotate(total=Count('id')).order_by('-total')[:10]
+            ),
+            'exams': enrich(
+                ExamAttempt.objects.filter(student_id__in=student_ids, passed=True)
+                .values('student_id').annotate(total=Count('id'), avg_score=Avg('score'))
+                .order_by('-total', '-avg_score')[:10],
+                extra_keys=['avg_score']
+            ),
+            'tasks': enrich(
+                TaskSubmission.objects.filter(student_id__in=student_ids)
+                .values('student_id').annotate(total=Count('id')).order_by('-total')[:10]
+            ),
+        }
+
+        for u in students:
+            avg_prog = Enrollment.objects.filter(student=u).aggregate(a=Avg('progress'))['a'] or 0
+            student_stats.append({
+                'user':         u,
+                'enrollments':  Enrollment.objects.filter(student=u).count(),
+                'completed':    Enrollment.objects.filter(student=u, progress=100).count(),
+                'lessons':      LessonProgress.objects.filter(student=u).count(),
+                'exams_passed': ExamAttempt.objects.filter(student=u, passed=True).count(),
+                'avg_progress': round(avg_prog),
+                'last_login':   u.last_login,
+            })
+        student_stats.sort(key=lambda x: x['lessons'], reverse=True)
+
+    return render(request, 'accounts/company_dashboard.html', {
+        'company':       company,
+        'student_stats': student_stats,
+        'kpis':          kpis,
+        'rankings':      rankings,
+        'reg_errors':    reg_errors or [],
+        'reg_data':      reg_data or {},
+    })
+
+
+def company_dashboard(request, token):
+    from accounts.models import Company
+    company = get_object_or_404(Company, public_token=token)
+    return _render_company_dashboard(request, company)
+
+
+
+    from django.db.models import Count, Avg, Sum, Max
+    from django.utils import timezone
+    from datetime import timedelta
+
+    company = get_object_or_404(Company, public_token=token)
+
+    # Usuarios de la empresa
+    profiles = company.users.select_related('user').all()
+    students = [p.user for p in profiles]
+    student_ids = [u.pk for u in students]
+
+    if not student_ids:
+        return render(request, 'accounts/company_dashboard.html', {
+            'company': company,
+            'students': [],
+            'kpis': {},
+            'rankings': {},
+        })
+
+    # ── KPIs globales (código antiguo eliminado — ver _render_company_dashboard) ──
+
+
+# ─── ASISTENCIA PÚBLICA DE EMPRESA ───────────────────────────────
+
+@require_http_methods(['GET', 'POST'])
+def company_attendance(request, token):
+    from accounts.models import Company, Attendance
+    company = get_object_or_404(Company, attendance_token=token)
+    submitted = False
+    errors = []
+
+    if request.method == 'POST':
+        name     = request.POST.get('name', '').strip()
+        email    = request.POST.get('email', '').strip()
+        phone    = request.POST.get('phone', '').strip()
+        position = request.POST.get('position', '').strip()
+        notes    = request.POST.get('notes', '').strip()
+
+        if not name:
+            errors.append('El nombre es obligatorio.')
+        else:
+            Attendance.objects.create(
+                company=company,
+                name=name,
+                email=email,
+                phone=phone,
+                position=position,
+                notes=notes,
+            )
+            submitted = True
+
+    return render(request, 'accounts/company_attendance.html', {
+        'company':   company,
+        'submitted': submitted,
+        'errors':    errors,
+    })
+
+
+# ─── ADMIN: CONTACTOS ────────────────────────────────────────────
+
+@staff_required
+def admin_contacts(request):
+    from accounts.models import Contact
+    q  = request.GET.get('q', '').strip()
+    qs = Contact.objects.all()
+    if q:
+        qs = qs.filter(
+            first_name__icontains=q
+        ) | Contact.objects.filter(
+            last_name__icontains=q
+        ) | Contact.objects.filter(
+            email__icontains=q
+        ) | Contact.objects.filter(
+            company__icontains=q
+        )
+        qs = qs.distinct()
+    paginator = Paginator(qs, 20)
+    page      = paginator.get_page(request.GET.get('page', 1))
+    return render(request, 'accounts/admin_contacts.html', {
+        'active_nav': 'admin_contacts',
+        'page_obj':   page,
+        'q':          q,
+        'total':      qs.count(),
+    })
+
+
+@staff_required
+@require_http_methods(['GET', 'POST'])
+def admin_contact_view(request, contact_id):
+    from accounts.models import Contact
+    contact = get_object_or_404(Contact, pk=contact_id)
+    if request.method == 'POST' and request.POST.get('action') == 'delete':
+        contact.delete()
+        messages.success(request, 'Contacto eliminado.')
+        return redirect('accounts:admin_contacts')
+    return render(request, 'accounts/admin_contact_detail.html', {
+        'active_nav': 'admin_contacts',
+        'contact':    contact,
     })
 
 
@@ -446,6 +841,9 @@ def admin_course_form(request, course_id=None):
         is_published  = request.POST.get('is_published') == 'on'
         is_featured   = request.POST.get('is_featured') == 'on'
         new_image     = request.FILES.get('featured_image')
+        demo_url      = request.POST.get('demo_url', '').strip()
+        demo_login    = request.POST.get('demo_login', '').strip()
+        demo_password = request.POST.get('demo_password', '').strip()
 
         try:
             price = float(price_raw.replace(',', '.'))
@@ -473,6 +871,9 @@ def admin_course_form(request, course_id=None):
                 target.instructor    = instructor
                 target.is_published  = is_published
                 target.is_featured   = is_featured
+                target.demo_url      = demo_url
+                target.demo_login    = demo_login
+                target.demo_password = demo_password
                 if new_image:
                     if target.featured_image and os.path.isfile(target.featured_image.path):
                         os.remove(target.featured_image.path)
@@ -491,6 +892,9 @@ def admin_course_form(request, course_id=None):
                     is_featured=is_featured,
                     instructor=instructor,
                     featured_image=new_image,
+                    demo_url=demo_url,
+                    demo_login=demo_login,
+                    demo_password=demo_password,
                 )
                 course.categories.set(Category.objects.filter(pk__in=cat_ids))
                 messages.success(request, f'Curso "{course.title}" creado correctamente.')
@@ -1265,6 +1669,20 @@ def admin_config(request):
         config.enable_registration = request.POST.get('enable_registration') == 'on'
         config.site_name           = request.POST.get('site_name', 'Nooxial').strip() or 'Nooxial'
         config.maintenance_mode    = request.POST.get('maintenance_mode') == 'on'
+        # Email
+        config.email_host          = request.POST.get('email_host', '').strip()
+        config.email_port          = int(request.POST.get('email_port', 587) or 587)
+        config.email_host_user     = request.POST.get('email_host_user', '').strip()
+        # Solo actualizar contraseña si se envía un valor (evitar borrar al dejar vacío)
+        pwd = request.POST.get('email_host_password', '')
+        if pwd:
+            config.email_host_password = pwd
+        config.email_use_tls       = request.POST.get('email_use_tls') == 'on'
+        config.email_use_ssl       = request.POST.get('email_use_ssl') == 'on'
+        config.default_from_email  = request.POST.get('default_from_email', '').strip()
+        config.send_welcome_email      = request.POST.get('send_welcome_email') == 'on'
+        config.cookie_consent_enabled  = request.POST.get('cookie_consent_enabled') == 'on'
+        config.cookie_consent_text     = request.POST.get('cookie_consent_text', '').strip()
         config.save()
         messages.success(request, 'Configuración guardada correctamente.')
         return redirect('accounts:admin_config')
@@ -1273,3 +1691,875 @@ def admin_config(request):
         'active_nav': 'admin_config',
         'config':     config,
     })
+
+
+# ─── BLOQUEO DE PANTALLA ─────────────────────────────────────────
+
+@login_required
+@require_http_methods(['POST'])
+def lock_view(request):
+    """Activa el bloqueo de pantalla en la sesión."""
+    request.session['screen_locked'] = True
+    return redirect('accounts:lock_screen')
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def lock_screen_view(request):
+    from accounts.models import UserProfile
+    from django.contrib.auth.hashers import make_password, check_password as check_pwd
+
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    error = None
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'unlock':
+            pin = request.POST.get('pin', '').strip()
+            if not profile.has_pin:
+                error = 'No tienes PIN configurado.'
+            elif not pin.isdigit() or len(pin) != 4:
+                error = 'El PIN debe ser 4 dígitos.'
+            elif check_pwd(pin, profile.pin_hash):
+                request.session['screen_locked'] = False
+                return redirect('courses:dashboard')
+            else:
+                error = 'PIN incorrecto. Inténtalo de nuevo.'
+
+        elif action == 'set_pin':
+            pin1 = request.POST.get('pin1', '').strip()
+            pin2 = request.POST.get('pin2', '').strip()
+            if not pin1.isdigit() or len(pin1) != 4:
+                error = 'El PIN debe ser exactamente 4 dígitos numéricos.'
+            elif pin1 != pin2:
+                error = 'Los PINs no coinciden.'
+            else:
+                profile.pin_hash = make_password(pin1)
+                profile.save(update_fields=['pin_hash'])
+                # Si estaba bloqueado, desbloquear
+                request.session['screen_locked'] = False
+                return redirect('courses:dashboard')
+
+    return render(request, 'accounts/lock_screen.html', {
+        'profile': profile,
+        'error':   error,
+        'locked':  request.session.get('screen_locked', False),
+    })
+
+
+@login_required
+@require_http_methods(['POST'])
+def change_pin_view(request):
+    """Cambiar o eliminar el PIN desde el perfil."""
+    from accounts.models import UserProfile
+    from django.contrib.auth.hashers import make_password, check_password as check_pwd
+
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    action = request.POST.get('pin_action')
+
+    if action == 'set':
+        pin1 = request.POST.get('pin1', '').strip()
+        pin2 = request.POST.get('pin2', '').strip()
+        if not pin1.isdigit() or len(pin1) != 4:
+            messages.error(request, 'El PIN debe ser exactamente 4 dígitos numéricos.')
+        elif pin1 != pin2:
+            messages.error(request, 'Los PINs no coinciden.')
+        else:
+            profile.pin_hash = make_password(pin1)
+            profile.save(update_fields=['pin_hash'])
+            messages.success(request, 'PIN configurado correctamente.')
+
+    elif action == 'remove':
+        profile.pin_hash = ''
+        profile.save(update_fields=['pin_hash'])
+        messages.success(request, 'PIN eliminado.')
+
+    return redirect('accounts:profile')
+
+
+# ─── UTILIDADES DE EMAIL ─────────────────────────────────────────
+
+def _get_email_connection():
+    """Devuelve una conexión SMTP usando la config guardada en SiteConfig."""
+    from accounts.models import SiteConfig
+    from django.core.mail import get_connection
+    cfg = SiteConfig.get()
+    if not cfg.email_host or not cfg.email_host_user:
+        return None, None
+    conn = get_connection(
+        backend='django.core.mail.backends.smtp.EmailBackend',
+        host=cfg.email_host,
+        port=cfg.email_port,
+        username=cfg.email_host_user,
+        password=cfg.email_host_password,
+        use_tls=cfg.email_use_tls,
+        use_ssl=cfg.email_use_ssl,
+        fail_silently=True,
+    )
+    from_email = cfg.default_from_email or cfg.email_host_user
+    return conn, from_email
+
+
+def _send_welcome_email(user):
+    """Envía el email de bienvenida si está activado en SiteConfig."""
+    from accounts.models import SiteConfig
+    from django.core.mail import EmailMessage
+    cfg = SiteConfig.get()
+    if not cfg.send_welcome_email:
+        return
+    conn, from_email = _get_email_connection()
+    if conn is None:
+        return
+    subject = f'¡Bienvenido/a a {cfg.site_name}!'
+    body = (
+        f'Hola {user.first_name or user.username},\n\n'
+        f'Tu cuenta en {cfg.site_name} ha sido creada correctamente.\n'
+        f'Ya puedes acceder a todos los cursos y contenidos disponibles.\n\n'
+        f'¡Gracias por unirte!\n\n'
+        f'El equipo de {cfg.site_name}'
+    )
+    try:
+        EmailMessage(subject, body, from_email, [user.email], connection=conn).send()
+    except Exception:
+        pass
+
+
+# ─── RECUPERACIÓN DE CONTRASEÑA ──────────────────────────────────
+
+@require_http_methods(['GET', 'POST'])
+def forgot_password_view(request):
+    if request.user.is_authenticated:
+        return redirect('courses:dashboard')
+
+    sent = False
+    if request.method == 'POST':
+        email = request.POST.get('email', '').strip()
+        conn, from_email = _get_email_connection()
+        try:
+            user_obj = User.objects.get(email__iexact=email, is_active=True)
+        except User.DoesNotExist:
+            user_obj = None
+
+        if user_obj and conn is not None:
+            from accounts.models import PasswordResetToken, SiteConfig
+            from django.core.mail import EmailMessage
+            # Invalidar tokens previos
+            PasswordResetToken.objects.filter(user=user_obj, used=False).update(used=True)
+            token_obj = PasswordResetToken.objects.create(user=user_obj)
+            reset_url = request.build_absolute_uri(
+                f'/accounts/reset-password/{token_obj.token}/'
+            )
+            cfg = SiteConfig.get()
+            subject = f'Recupera tu contraseña – {cfg.site_name}'
+            body = (
+                f'Hola {user_obj.first_name or user_obj.username},\n\n'
+                f'Recibimos una solicitud para restablecer la contraseña de tu cuenta.\n\n'
+                f'Haz clic en el siguiente enlace (válido durante 2 horas):\n{reset_url}\n\n'
+                f'Si no solicitaste este cambio, ignora este mensaje.\n\n'
+                f'El equipo de {cfg.site_name}'
+            )
+            try:
+                EmailMessage(subject, body, from_email, [user_obj.email], connection=conn).send()
+            except Exception:
+                pass
+        # Siempre mostrar el mismo mensaje (evitar enumeración de usuarios)
+        sent = True
+
+    return render(request, 'accounts/forgot_password.html', {'sent': sent})
+
+
+@require_http_methods(['GET', 'POST'])
+def reset_password_view(request, token):
+    if request.user.is_authenticated:
+        return redirect('courses:dashboard')
+
+    from accounts.models import PasswordResetToken
+    try:
+        token_obj = PasswordResetToken.objects.select_related('user').get(token=token)
+    except PasswordResetToken.DoesNotExist:
+        token_obj = None
+
+    valid = token_obj is not None and token_obj.is_valid()
+
+    if request.method == 'POST' and valid:
+        p1 = request.POST.get('password1', '')
+        p2 = request.POST.get('password2', '')
+        if p1 != p2:
+            messages.error(request, 'Las contraseñas no coinciden.')
+        elif len(p1) < 8:
+            messages.error(request, 'La contraseña debe tener al menos 8 caracteres.')
+        else:
+            token_obj.user.set_password(p1)
+            token_obj.user.save()
+            token_obj.used = True
+            token_obj.save()
+            messages.success(request, 'Contraseña restablecida correctamente. Ya puedes iniciar sesión.')
+            return redirect('accounts:login')
+
+    return render(request, 'accounts/reset_password.html', {'valid': valid, 'token': token})
+
+
+@staff_required
+def admin_config_test_email(request):
+    """Envía un email de prueba al admin que lo solicita y devuelve JSON."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'message': 'Método no permitido.'}, status=405)
+
+    conn, from_email = _get_email_connection()
+    if conn is None:
+        return JsonResponse({
+            'ok': False,
+            'message': 'La configuración SMTP está incompleta. Guarda primero el servidor y el usuario SMTP.',
+        })
+
+    from django.core.mail import EmailMessage
+    from accounts.models import SiteConfig
+    cfg = SiteConfig.get()
+    subject = f'Prueba de email – {cfg.site_name}'
+    body = (
+        f'Este es un correo de prueba enviado desde el panel de {cfg.site_name}.\n\n'
+        f'Si lo recibes, la configuración SMTP es correcta.'
+    )
+    try:
+        sent = EmailMessage(subject, body, from_email, [request.user.email], connection=conn).send()
+        if sent:
+            return JsonResponse({
+                'ok': True,
+                'message': f'Email enviado correctamente a {request.user.email}.',
+            })
+        return JsonResponse({
+            'ok': False,
+            'message': 'El servidor no reportó error pero tampoco confirmó el envío.',
+        })
+    except Exception as e:
+        return JsonResponse({'ok': False, 'message': f'Error SMTP: {e}'})
+
+
+# ─── ADMIN: VOTACIONES ───────────────────────────────────────────
+
+@staff_required
+def admin_votings(request):
+    from accounts.models import Voting
+    votings = Voting.objects.prefetch_related('options').order_by('-created_at')
+    return render(request, 'accounts/admin_votings.html', {
+        'active_nav': 'admin_votings',
+        'votings':    votings,
+    })
+
+
+@staff_required
+@require_http_methods(['GET', 'POST'])
+def admin_voting_form(request, voting_id=None):
+    from accounts.models import Voting, VotingOption
+    editing = voting_id is not None
+    target  = get_object_or_404(Voting, pk=voting_id) if editing else None
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'delete' and editing:
+            target.delete()
+            messages.success(request, 'Votación eliminada.')
+            return redirect('accounts:admin_votings')
+
+        name        = request.POST.get('name', '').strip()
+        description = request.POST.get('description', '').strip()
+        is_active   = request.POST.get('is_active') == 'on'
+        ends_at_raw = request.POST.get('ends_at', '').strip()
+        options_raw = [o.strip() for o in request.POST.getlist('option_name') if o.strip()]
+
+        if not name:
+            messages.error(request, 'El nombre es obligatorio.')
+        elif len(options_raw) < 2:
+            messages.error(request, 'Debes añadir al menos 2 opciones.')
+        else:
+            from django.utils.dateparse import parse_datetime
+            ends_at = parse_datetime(ends_at_raw) if ends_at_raw else None
+
+            if editing:
+                target.name        = name
+                target.description = description
+                target.is_active   = is_active
+                target.ends_at     = ends_at
+                target.save()
+                target.options.all().delete()
+            else:
+                target = Voting.objects.create(
+                    name=name, description=description,
+                    is_active=is_active, ends_at=ends_at,
+                )
+
+            for i, opt in enumerate(options_raw):
+                VotingOption.objects.create(voting=target, name=opt, order=i)
+
+            messages.success(request, 'Votación guardada correctamente.')
+            return redirect('accounts:admin_voting_edit', voting_id=target.pk)
+
+    return render(request, 'accounts/admin_voting_form.html', {
+        'active_nav': 'admin_votings',
+        'editing':    editing,
+        'target':     target,
+    })
+
+
+# ─── PÚBLICA: VOTAR ──────────────────────────────────────────────
+
+def public_vote(request, token):
+    from accounts.models import Voting, Vote
+    voting = get_object_or_404(Voting, public_token=token)
+
+    # IP del visitante
+    def get_ip(req):
+        x = req.META.get('HTTP_X_FORWARDED_FOR')
+        return x.split(',')[0].strip() if x else req.META.get('REMOTE_ADDR', '')
+
+    ip = get_ip(request)
+    already_voted = False
+    my_vote = None
+
+    if request.user.is_authenticated:
+        my_vote = Vote.objects.filter(voting=voting, user=request.user).first()
+        already_voted = my_vote is not None
+    elif request.session.get(f'voted_{voting.pk}'):
+        already_voted = True
+
+    error = None
+    if request.method == 'POST' and not already_voted and voting.is_open:
+        option_id    = request.POST.get('option')
+        voter_name   = request.POST.get('voter_name', '').strip()
+        voter_email  = request.POST.get('voter_email', '').strip()
+        voter_phone  = request.POST.get('voter_phone', '').strip()
+
+        if not option_id:
+            error = 'Selecciona una opción para votar.'
+        elif not request.user.is_authenticated and not voter_name:
+            error = 'Introduce tu nombre para votar.'
+        else:
+            from accounts.models import VotingOption
+            option = get_object_or_404(VotingOption, pk=option_id, voting=voting)
+            Vote.objects.create(
+                voting=voting,
+                option=option,
+                user=request.user if request.user.is_authenticated else None,
+                voter_name=voter_name if not request.user.is_authenticated else request.user.get_full_name() or request.user.username,
+                voter_email=voter_email if not request.user.is_authenticated else request.user.email,
+                voter_phone=voter_phone,
+                ip_address=ip,
+            )
+            if request.user.is_authenticated:
+                my_vote = Vote.objects.filter(voting=voting, user=request.user).first()
+            else:
+                request.session[f'voted_{voting.pk}'] = str(option.pk)
+            already_voted = True
+
+    return render(request, 'accounts/public_vote.html', {
+        'voting':         voting,
+        'already_voted':  already_voted,
+        'my_vote':        my_vote,
+        'session_option': request.session.get(f'voted_{voting.pk}'),
+        'error':          error,
+    })
+
+
+def public_vote_results(request, token):
+    from accounts.models import Voting
+    voting = get_object_or_404(Voting, public_token=token)
+    return render(request, 'accounts/public_vote_results.html', {'voting': voting})
+
+
+def voting_api(request, token):
+    """JSON con resultados en tiempo real."""
+    from accounts.models import Voting
+    from django.db.models import Count
+    voting = get_object_or_404(Voting, public_token=token)
+    total = voting.total_votes
+    options = []
+    for opt in voting.options.annotate(cnt=Count('votes')).order_by('order'):
+        pct = round(opt.cnt / total * 100) if total else 0
+        options.append({'id': opt.pk, 'name': opt.name, 'votes': opt.cnt, 'pct': pct})
+    return JsonResponse({'total': total, 'options': options, 'is_open': voting.is_open})
+
+
+# ─── CHAT DIRECTO ────────────────────────────────────────────────
+
+@login_required
+def dm_conversations(request):
+    """JSON: lista de conversaciones con último mensaje y no leídos."""
+    from accounts.models import DirectMessage
+    from django.db.models import Q, Max, Count, OuterRef, Subquery
+    me = request.user
+
+    # IDs de usuarios con quienes hay mensajes
+    partners = set(
+        list(DirectMessage.objects.filter(sender=me).values_list('recipient_id', flat=True)) +
+        list(DirectMessage.objects.filter(recipient=me).values_list('sender_id', flat=True))
+    )
+    partners.discard(me.pk)
+
+    result = []
+    for uid in partners:
+        partner = User.objects.filter(pk=uid).first()
+        if not partner:
+            continue
+        last = DirectMessage.objects.filter(
+            Q(sender=me, recipient=partner) | Q(sender=partner, recipient=me)
+        ).order_by('-created_at').first()
+        unread = DirectMessage.objects.filter(sender=partner, recipient=me, is_read=False).count()
+        result.append({
+            'user_id':    partner.pk,
+            'name':       partner.get_full_name() or partner.username,
+            'username':   partner.username,
+            'avatar':     partner.first_name[:1].upper() or partner.username[:1].upper(),
+            'last_msg':   last.content[:60] if last else '',
+            'last_time':  last.created_at.strftime('%H:%M') if last else '',
+            'unread':     unread,
+        })
+    result.sort(key=lambda x: x['last_time'], reverse=True)
+
+    total_unread = DirectMessage.objects.filter(recipient=me, is_read=False).count()
+    return JsonResponse({'conversations': result, 'total_unread': total_unread})
+
+
+@login_required
+def dm_thread(request, user_id):
+    """JSON: hilo de mensajes con un usuario + marcar como leídos."""
+    from accounts.models import DirectMessage
+    from django.db.models import Q
+    partner = get_object_or_404(User, pk=user_id)
+    me = request.user
+
+    msgs = DirectMessage.objects.filter(
+        Q(sender=me, recipient=partner) | Q(sender=partner, recipient=me)
+    ).order_by('created_at')
+
+    # Marcar leídos
+    DirectMessage.objects.filter(sender=partner, recipient=me, is_read=False).update(is_read=True)
+
+    data = [{
+        'id':       m.pk,
+        'content':  m.content,
+        'mine':     m.sender_id == me.pk,
+        'time':     m.created_at.strftime('%H:%M'),
+    } for m in msgs]
+    return JsonResponse({'messages': data, 'partner_name': partner.get_full_name() or partner.username})
+
+
+@login_required
+@require_POST
+def dm_send(request):
+    """JSON: enviar mensaje directo."""
+    from accounts.models import DirectMessage
+    import json
+    try:
+        body = json.loads(request.body)
+    except Exception:
+        body = request.POST
+    recipient_id = body.get('recipient_id')
+    content      = str(body.get('content', '')).strip()
+
+    if not content or not recipient_id:
+        return JsonResponse({'ok': False, 'error': 'Datos incompletos'}, status=400)
+    if int(recipient_id) == request.user.pk:
+        return JsonResponse({'ok': False, 'error': 'No puedes enviarte mensajes a ti mismo'}, status=400)
+
+    recipient = get_object_or_404(User, pk=recipient_id)
+    msg = DirectMessage.objects.create(
+        sender=request.user, recipient=recipient, content=content
+    )
+    return JsonResponse({'ok': True, 'id': msg.pk, 'time': msg.created_at.strftime('%H:%M')})
+
+
+@login_required
+def dm_user_search(request):
+    """JSON: buscar usuarios por nombre/email para iniciar chat."""
+    q = request.GET.get('q', '').strip()
+    if len(q) < 2:
+        return JsonResponse({'users': []})
+    from django.db.models import Q
+    qs = User.objects.filter(is_active=True).exclude(pk=request.user.pk)
+    qs = qs.filter(
+        Q(first_name__icontains=q) | Q(last_name__icontains=q) |
+        Q(username__icontains=q) | Q(email__icontains=q)
+    )[:10]
+    users = [{
+        'id':       u.pk,
+        'name':     u.get_full_name() or u.username,
+        'username': u.username,
+        'avatar':   (u.first_name[:1] or u.username[:1]).upper(),
+    } for u in qs]
+    return JsonResponse({'users': users})
+
+
+# ─── ADMIN: TÉRMINOS Y CONDICIONES ───────────────────────────────
+
+@staff_required
+def admin_terms(request):
+    from accounts.models import TermsConditions
+    terms_list = TermsConditions.objects.order_by('-created_at')
+    return render(request, 'accounts/admin_terms.html', {
+        'active_nav': 'admin_terms',
+        'terms_list': terms_list,
+    })
+
+
+@staff_required
+@require_http_methods(['GET', 'POST'])
+def admin_terms_form(request, terms_id=None):
+    from accounts.models import TermsConditions
+    editing = terms_id is not None
+    target  = get_object_or_404(TermsConditions, pk=terms_id) if editing else None
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'delete' and editing:
+            target.delete()
+            messages.success(request, 'Términos eliminados.')
+            return redirect('accounts:admin_terms')
+
+        title       = request.POST.get('title', '').strip() or 'Términos y Condiciones'
+        description = request.POST.get('description', '').strip()
+        version     = request.POST.get('version', '').strip()
+        is_active   = request.POST.get('is_active') == 'on'
+
+        if not description:
+            messages.error(request, 'El contenido es obligatorio.')
+        else:
+            if editing:
+                target.title       = title
+                target.description = description
+                target.version     = version
+                target.is_active   = is_active
+                target.save()
+                messages.success(request, 'Términos actualizados.')
+                return redirect('accounts:admin_terms_edit', terms_id=target.pk)
+            else:
+                tc = TermsConditions.objects.create(
+                    title=title, description=description,
+                    version=version, is_active=is_active,
+                )
+                messages.success(request, 'Términos creados.')
+                return redirect('accounts:admin_terms_edit', terms_id=tc.pk)
+
+    return render(request, 'accounts/admin_terms_form.html', {
+        'active_nav': 'admin_terms',
+        'editing':    editing,
+        'target':     target,
+    })
+
+
+# ─── ACEPTAR TÉRMINOS (USUARIOS) ─────────────────────────────────
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def accept_terms_view(request):
+    from accounts.models import TermsConditions, TermsAcceptance
+    active = TermsConditions.get_active()
+    if not active:
+        return redirect('courses:dashboard')
+
+    already = TermsAcceptance.objects.filter(user=request.user, terms=active).exists()
+    if already:
+        return redirect('courses:dashboard')
+
+    if request.method == 'POST':
+        accepted = request.POST.get('accept') == 'yes'
+        if accepted:
+            x_forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
+            ip = x_forwarded.split(',')[0].strip() if x_forwarded else request.META.get('REMOTE_ADDR')
+            TermsAcceptance.objects.create(user=request.user, terms=active, ip_address=ip)
+            return redirect('courses:dashboard')
+        else:
+            # No acepta: cerrar sesión
+            from django.contrib.auth import logout as auth_logout
+            auth_logout(request)
+            return redirect('accounts:login')
+
+    return render(request, 'accounts/accept_terms.html', {'terms': active})
+
+
+# ─── REGISTRO POR PLAN DE CAPACITACIÓN ──────────────────────────
+
+def plan_register_view(request, token, company_id=None):
+    from courses.models import TrainingPlan, Enrollment
+    from accounts.models import SiteConfig, Company
+    plan    = get_object_or_404(TrainingPlan, register_token=token, is_active=True)
+    company = get_object_or_404(Company, pk=company_id) if company_id else None
+    config  = SiteConfig.get()
+
+    if not config.enable_registration:
+        return render(request, 'accounts/register_closed.html', {'plan': plan})
+
+    error = None
+    if request.method == 'POST':
+        first_name = request.POST.get('first_name', '').strip()
+        last_name  = request.POST.get('last_name', '').strip()
+        email      = request.POST.get('email', '').strip().lower()
+        username   = request.POST.get('username', '').strip()
+        password1  = request.POST.get('password1', '')
+        password2  = request.POST.get('password2', '')
+
+        if not all([first_name, last_name, email, username, password1]):
+            error = 'Todos los campos son obligatorios.'
+        elif password1 != password2:
+            error = 'Las contraseñas no coinciden.'
+        elif len(password1) < 6:
+            error = 'La contraseña debe tener al menos 6 caracteres.'
+        elif User.objects.filter(username=username).exists():
+            error = 'Ese nombre de usuario ya está en uso.'
+        elif User.objects.filter(email=email).exists():
+            error = 'Ya existe una cuenta con ese correo electrónico.'
+        else:
+            user = User.objects.create_user(
+                username=username, email=email,
+                password=password1,
+                first_name=first_name, last_name=last_name,
+            )
+            from django.contrib.auth import login as auth_login
+            auth_login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+            if company:
+                from accounts.models import UserProfile
+                UserProfile.objects.filter(user=user).update(company=company)
+            courses = plan.courses.filter(is_published=True)
+            for course in courses:
+                Enrollment.objects.get_or_create(student=user, course=course)
+            return redirect('courses:dashboard')
+
+    return render(request, 'accounts/plan_register.html', {
+        'plan':    plan,
+        'company': company,
+        'error':   error,
+    })
+
+def public_cv(request, username):
+    target_user = get_object_or_404(User, username=username, is_active=True)
+    try:
+        profile = target_user.profile
+    except Exception:
+        from django.http import Http404
+        raise Http404
+    if not profile.cv_public or not (profile.cv_headline or profile.cv_summary or profile.cv_experience or profile.cv_education or profile.cv_skills):
+        from django.http import Http404
+        raise Http404
+    return render(request, 'accounts/public_cv.html', {
+        'target_user': target_user,
+        'profile':     profile,
+    })
+
+
+# ─── GRUPOS DE CHAT (ADMIN) ──────────────────────────────────────
+
+@login_required
+def admin_chat_groups(request):
+    if not request.user.is_staff:
+        return redirect('courses:dashboard')
+    from accounts.models import ChatGroup
+    groups = ChatGroup.objects.prefetch_related('companies', 'members').order_by('name')
+    return render(request, 'accounts/admin_chat_groups.html', {
+        'active_nav': 'admin_chat_groups',
+        'groups': groups,
+    })
+
+
+@login_required
+def admin_chat_group_form(request, group_id=None):
+    if not request.user.is_staff:
+        return redirect('courses:dashboard')
+    from accounts.models import ChatGroup, Company
+    editing = group_id is not None
+    group   = get_object_or_404(ChatGroup, pk=group_id) if editing else None
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'delete' and editing:
+            group.delete()
+            messages.success(request, 'Grupo eliminado.')
+            return redirect('accounts:admin_chat_groups')
+
+        name        = request.POST.get('name', '').strip()
+        description = request.POST.get('description', '').strip()
+        is_active   = request.POST.get('is_active') == '1'
+        company_ids = request.POST.getlist('companies')
+        member_ids  = request.POST.getlist('members')
+
+        if not name:
+            messages.error(request, 'El nombre es obligatorio.')
+        else:
+            if editing:
+                group.name        = name
+                group.description = description
+                group.is_active   = is_active
+                group.save()
+            else:
+                group = ChatGroup.objects.create(
+                    name=name, description=description,
+                    is_active=is_active, created_by=request.user,
+                )
+            group.companies.set(Company.objects.filter(pk__in=company_ids))
+            group.members.set(User.objects.filter(pk__in=member_ids))
+            messages.success(request, f'Grupo "{group.name}" guardado.')
+            return redirect('accounts:admin_chat_group_edit', group_id=group.pk)
+
+    all_companies = Company.objects.order_by('name')
+    all_users     = User.objects.filter(is_active=True).select_related('profile').order_by('first_name', 'last_name', 'username')
+    return render(request, 'accounts/admin_chat_group_form.html', {
+        'active_nav':     'admin_chat_groups',
+        'editing':        editing,
+        'group':          group,
+        'all_companies':  all_companies,
+        'all_users':      all_users,
+    })
+
+
+# ─── GRUPOS DE CHAT (API USUARIO) ────────────────────────────────
+
+@login_required
+def user_groups_api(request):
+    """Devuelve los grupos a los que pertenece el usuario autenticado."""
+    from accounts.models import ChatGroup
+    if request.user.is_staff:
+        groups = ChatGroup.objects.filter(is_active=True).prefetch_related('companies', 'members')
+    else:
+        groups = ChatGroup.objects.filter(is_active=True).prefetch_related('companies', 'members')
+    result = []
+    for g in groups:
+        if g.is_member(request.user):
+            last = g.messages.last()
+            result.append({
+                'id':          g.pk,
+                'name':        g.name,
+                'last':        last.content[:60] if last else '',
+                'time':        last.created_at.strftime('%H:%M') if last else '',
+                'last_msg_id': last.pk if last else 0,
+            })
+    return JsonResponse({'groups': result})
+
+
+@login_required
+def group_messages_api(request, group_id):
+    """GET: mensajes del grupo. POST: enviar mensaje."""
+    from accounts.models import ChatGroup, ChatGroupMessage
+    group = get_object_or_404(ChatGroup, pk=group_id, is_active=True)
+    if not group.is_member(request.user):
+        return JsonResponse({'ok': False, 'error': 'No perteneces a este grupo.'}, status=403)
+
+    if request.method == 'POST':
+        import json
+        try:
+            data = json.loads(request.body)
+        except Exception:
+            data = {}
+        content = data.get('content', '').strip()
+        if not content:
+            return JsonResponse({'ok': False, 'error': 'Mensaje vacío.'}, status=400)
+        msg = ChatGroupMessage.objects.create(group=group, sender=request.user, content=content)
+        return JsonResponse({
+            'ok':      True,
+            'id':      msg.pk,
+            'sender':  request.user.get_full_name() or request.user.username,
+            'content': msg.content,
+            'time':    msg.created_at.strftime('%H:%M'),
+            'mine':    True,
+        })
+
+    # GET
+    since_id = int(request.GET.get('since', 0))
+    msgs = group.messages.select_related('sender').filter(pk__gt=since_id).order_by('created_at')[:80]
+    return JsonResponse({'messages': [
+        {
+            'id':      m.pk,
+            'sender':  m.sender.get_full_name() or m.sender.username,
+            'content': m.content,
+            'time':    m.created_at.strftime('%H:%M'),
+            'mine':    m.sender_id == request.user.pk,
+        }
+        for m in msgs
+    ]})
+
+
+# ─── SALA DE REUNIÓN POR EMPRESA ─────────────────────────────────
+
+@login_required
+def company_meeting(request, company_id=None):
+    from accounts.models import Company
+    if request.user.is_staff:
+        if company_id:
+            company = get_object_or_404(Company, pk=company_id)
+        else:
+            companies = Company.objects.order_by('name')
+            return render(request, 'accounts/meeting_select.html', {
+                'active_nav': 'meeting',
+                'companies':  companies,
+            })
+    else:
+        try:
+            company = request.user.profile.company
+        except Exception:
+            company = None
+        if not company:
+            return render(request, 'accounts/meeting_no_company.html', {
+                'active_nav': 'meeting',
+            })
+
+    display_name = request.user.get_full_name() or request.user.username
+    return render(request, 'accounts/meeting_room.html', {
+        'active_nav':   'meeting',
+        'company':      company,
+        'display_name': display_name,
+    })
+
+
+@login_required
+def meeting_signal_post(request):
+    """POST: enviar señal WebRTC (offer, answer, ice, join, leave)."""
+    import json
+    from accounts.models import Company, MeetingSignal
+    from django.utils import timezone
+    from datetime import timedelta
+    try:
+        body = json.loads(request.body)
+    except Exception:
+        return JsonResponse({'ok': False}, status=400)
+
+    company = get_object_or_404(Company, pk=body.get('company_id'))
+    # Limpiar señales antiguas (> 60 s)
+    MeetingSignal.objects.filter(
+        company=company,
+        created_at__lt=timezone.now() - timedelta(seconds=60)
+    ).delete()
+
+    sig = MeetingSignal.objects.create(
+        company=company,
+        peer_id=body.get('peer_id', ''),
+        target=body.get('target', ''),
+        stype=body.get('stype', ''),
+        data=json.dumps(body.get('data', {})),
+    )
+    return JsonResponse({'ok': True, 'id': sig.pk})
+
+
+@login_required
+def meeting_signal_poll(request):
+    """GET: obtener señales nuevas para este peer."""
+    from accounts.models import Company, MeetingSignal
+    from django.utils import timezone
+    from datetime import timedelta
+    from django.db.models import Q
+
+    company  = get_object_or_404(Company, pk=request.GET.get('company_id'))
+    peer_id  = request.GET.get('peer_id', '')
+    since_id = int(request.GET.get('since', 0))
+    cutoff   = timezone.now() - timedelta(seconds=45)
+
+    signals = MeetingSignal.objects.filter(
+        company=company,
+        id__gt=since_id,
+        created_at__gte=cutoff,
+    ).filter(
+        Q(target='') | Q(target=peer_id)
+    ).exclude(peer_id=peer_id)
+
+    return JsonResponse({'signals': [
+        {'id': s.pk, 'peer_id': s.peer_id, 'stype': s.stype,
+         'data': s.data, 'target': s.target}
+        for s in signals
+    ]})

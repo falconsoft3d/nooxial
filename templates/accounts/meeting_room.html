@@ -1,0 +1,293 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Reunión – {{ company.name }} – Nooxial{% endblock %}
+
+{% block extra_head %}
+<style>
+  #meeting-grid {
+    display: grid;
+    gap: 8px;
+    flex: 1;
+    grid-template-columns: 1fr;
+  }
+  .video-tile {
+    background: #111827;
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+    aspect-ratio: 16/9;
+  }
+  .video-tile video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .peer-label {
+    position: absolute; bottom: 10px; left: 10px;
+    background: rgba(0,0,0,.55); color: #fff;
+    font-size: 12px; font-weight: 600;
+    padding: 3px 10px; border-radius: 20px;
+    backdrop-filter: blur(4px);
+  }
+  .ctrl-btn {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: #e5e7eb; color: #374151;
+    border: none; cursor: pointer; transition: background .15s;
+  }
+  .ctrl-btn:hover { background: #d1d5db; }
+  .ctrl-btn.active { background: #fee2e2; color: #dc2626; }
+  .ctrl-btn.screen-on { background: #dbeafe; color: #2563eb; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col" style="height:calc(100vh - 120px)">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-3 flex-shrink-0">
+    <div>
+      <h1 class="text-lg font-bold text-gray-900">{{ company.name }} — Sala de reunión</h1>
+      <p id="peer-count" class="text-xs text-gray-400 mt-0.5">Iniciando…</p>
+    </div>
+    {% if user.is_staff %}
+    <a href="{% url 'accounts:meeting' %}" class="text-xs text-gray-500 hover:text-gray-900 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors">
+      Cambiar empresa
+    </a>
+    {% endif %}
+  </div>
+
+  <!-- Video grid -->
+  <div id="meeting-grid" class="flex-1 min-h-0">
+    <div class="video-tile" id="local-tile">
+      <video id="local-video" autoplay muted playsinline></video>
+      <div class="peer-label">Tú</div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="flex items-center justify-center gap-3 mt-3 flex-shrink-0 py-2">
+    <button id="btn-mic" onclick="toggleMic()" title="Micrófono" class="ctrl-btn">
+      <svg id="ic-mic" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+      </svg>
+      <svg id="ic-mic-off" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
+      </svg>
+    </button>
+
+    <button id="btn-cam" onclick="toggleCam()" title="Cámara" class="ctrl-btn">
+      <svg id="ic-cam" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+      </svg>
+      <svg id="ic-cam-off" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2zM3 3l18 18"/>
+      </svg>
+    </button>
+
+    <button id="btn-screen" onclick="shareScreen()" title="Compartir pantalla" class="ctrl-btn">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+      </svg>
+    </button>
+
+    <button onclick="leaveRoom()"
+            class="px-5 py-2 bg-red-500 hover:bg-red-600 text-white font-bold text-sm rounded-2xl transition-colors">
+      Salir
+    </button>
+  </div>
+
+</div>
+
+{{ display_name|json_script:"meeting-name" }}
+
+<script>
+const ICE_CFG    = { iceServers: [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' },
+]};
+const COMPANY_ID = {{ company.pk }};
+const MY_NAME    = JSON.parse(document.getElementById('meeting-name').textContent);
+const CSRF       = document.querySelector('[name=csrfmiddlewaretoken]').value;
+const SIG_POST   = '{% url "accounts:meeting_signal_post" %}';
+const SIG_POLL   = '{% url "accounts:meeting_signal_poll" %}';
+const myPeerId   = Math.random().toString(36).slice(2, 12);
+
+let localStream  = null;
+let screenStream = null;
+let conns        = {};
+let lastSigId    = 0;
+let micOn = true, camOn = true;
+
+function postSig(target, stype, data) {
+  return fetch(SIG_POST, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify({ company_id: COMPANY_ID, peer_id: myPeerId, target: target || '', stype, data: data || {} }),
+  }).catch(() => {});
+}
+
+async function poll() {
+  const res = await fetch(`${SIG_POLL}?company_id=${COMPANY_ID}&peer_id=${myPeerId}&since=${lastSigId}`)
+    .then(r => r.json()).catch(() => ({ signals: [] }));
+  for (const s of res.signals) {
+    lastSigId = Math.max(lastSigId, s.id);
+    const d = JSON.parse(s.data || '{}');
+    if      (s.stype === 'join')   await onJoin(s.peer_id, d.name);
+    else if (s.stype === 'offer')  await onOffer(s.peer_id, d.name, d.sdp);
+    else if (s.stype === 'answer') await onAnswer(s.peer_id, d);
+    else if (s.stype === 'ice')    await onIce(s.peer_id, d);
+    else if (s.stype === 'leave')  closePeer(s.peer_id);
+  }
+}
+
+function makePC(peerId, name) {
+  const pc = new RTCPeerConnection(ICE_CFG);
+  conns[peerId] = { pc, name: name || peerId };
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  pc.onicecandidate = ({ candidate }) => { if (candidate) postSig(peerId, 'ice', candidate.toJSON()); };
+  pc.ontrack = e => addVideoTile(peerId, conns[peerId]?.name || peerId, e.streams[0]);
+  pc.onconnectionstatechange = () => {
+    if (['disconnected','failed','closed'].includes(pc.connectionState)) closePeer(peerId);
+  };
+  return pc;
+}
+
+async function onJoin(peerId, name) {
+  if (conns[peerId]) return;
+  const pc = makePC(peerId, name);
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await postSig(peerId, 'offer', { name: MY_NAME, sdp: offer });
+  updateCount();
+}
+
+async function onOffer(peerId, name, sdp) {
+  if (!conns[peerId]) makePC(peerId, name);
+  const { pc } = conns[peerId];
+  await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  await postSig(peerId, 'answer', answer);
+  updateCount();
+}
+
+async function onAnswer(peerId, sdp) {
+  const c = conns[peerId];
+  if (c?.pc) await c.pc.setRemoteDescription(new RTCSessionDescription(sdp));
+}
+
+async function onIce(peerId, candidate) {
+  const c = conns[peerId];
+  if (c?.pc) { try { await c.pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch(e) {} }
+}
+
+function closePeer(peerId) {
+  try { conns[peerId]?.pc?.close(); } catch(e) {}
+  delete conns[peerId];
+  const el = document.getElementById('tile-' + peerId);
+  if (el) el.remove();
+  updateGrid(); updateCount();
+}
+
+function addVideoTile(peerId, name, stream) {
+  let tile = document.getElementById('tile-' + peerId);
+  if (!tile) {
+    tile = document.createElement('div');
+    tile.className = 'video-tile';
+    tile.id = 'tile-' + peerId;
+    tile.innerHTML = `<video autoplay playsinline></video><div class="peer-label">${name}</div>`;
+    document.getElementById('meeting-grid').appendChild(tile);
+    updateGrid();
+  }
+  const vid = tile.querySelector('video');
+  vid.srcObject = stream;
+  vid.play().catch(() => {});
+}
+
+function updateGrid() {
+  const g = document.getElementById('meeting-grid');
+  const n = g.children.length;
+  g.style.gridTemplateColumns = n <= 1 ? '1fr' : 'repeat(2,1fr)';
+}
+
+function updateCount() {
+  const n = Object.keys(conns).length;
+  document.getElementById('peer-count').textContent = n > 0
+    ? `${n + 1} participantes en la sala`
+    : 'Solo tú · espera a que otros se unan';
+}
+
+function toggleMic() {
+  micOn = !micOn;
+  localStream.getAudioTracks().forEach(t => t.enabled = micOn);
+  document.getElementById('btn-mic').classList.toggle('active', !micOn);
+  document.getElementById('ic-mic').classList.toggle('hidden', !micOn);
+  document.getElementById('ic-mic-off').classList.toggle('hidden', micOn);
+}
+
+function toggleCam() {
+  camOn = !camOn;
+  localStream.getVideoTracks().forEach(t => t.enabled = camOn);
+  document.getElementById('btn-cam').classList.toggle('active', !camOn);
+  document.getElementById('ic-cam').classList.toggle('hidden', !camOn);
+  document.getElementById('ic-cam-off').classList.toggle('hidden', camOn);
+}
+
+async function shareScreen() {
+  try {
+    if (screenStream) {
+      screenStream.getTracks().forEach(t => t.stop());
+      screenStream = null;
+      const camTrack = localStream.getVideoTracks()[0];
+      document.getElementById('local-video').srcObject = localStream;
+      for (const { pc } of Object.values(conns)) {
+        const s = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (s && camTrack) s.replaceTrack(camTrack);
+      }
+      document.getElementById('btn-screen').classList.remove('screen-on');
+      return;
+    }
+    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+    const vt = screenStream.getVideoTracks()[0];
+    for (const { pc } of Object.values(conns)) {
+      const s = pc.getSenders().find(s => s.track?.kind === 'video');
+      if (s) s.replaceTrack(vt);
+    }
+    document.getElementById('local-video').srcObject = screenStream;
+    document.getElementById('btn-screen').classList.add('screen-on');
+    vt.onended = () => shareScreen();
+  } catch(e) {}
+}
+
+function leaveRoom() {
+  postSig('', 'leave', {});
+  if (localStream)  localStream.getTracks().forEach(t => t.stop());
+  if (screenStream) screenStream.getTracks().forEach(t => t.stop());
+  window.location.href = '{% url "courses:dashboard" %}';
+}
+
+async function init() {
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+  } catch(e) {
+    try { localStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch(e2) {
+      document.getElementById('peer-count').textContent = 'Sin acceso a cámara/micrófono. Comprueba los permisos del navegador.';
+      return;
+    }
+  }
+  if (localStream.getVideoTracks().length) {
+    document.getElementById('local-video').srcObject = localStream;
+  }
+  await postSig('', 'join', { name: MY_NAME });
+  updateCount();
+  setInterval(poll, 1500);
+  setInterval(() => postSig('', 'heartbeat', {}), 12000);
+  window.addEventListener('pagehide', () => postSig('', 'leave', {}));
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+{% endblock %}

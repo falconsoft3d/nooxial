@@ -1,0 +1,164 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{% if note %}{{ note.title }}{% else %}Nueva nota{% endif %} – Mis documentos{% endblock %}
+
+{% block topbar %}
+<nav class="flex items-center gap-1.5 text-sm text-gray-400">
+  <a href="{% url 'courses:my_docs' %}" class="hover:text-gray-700">Mis documentos</a>
+  {% if folder %}
+  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <a href="{% url 'courses:my_docs_folder' folder.pk %}" class="hover:text-gray-700">{{ folder.name }}</a>
+  {% endif %}
+  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+  </svg>
+  <span class="text-gray-900 font-semibold">{% if note %}{{ note.title }}{% else %}Nueva nota{% endif %}</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<form method="POST" class="max-w-3xl space-y-4">
+  {% csrf_token %}
+
+  <!-- Título -->
+  <input type="text" name="title" value="{{ note.title|default:'' }}"
+         placeholder="Título de la nota…" required autofocus
+         class="w-full text-2xl font-black text-gray-900 bg-transparent border-none outline-none
+                placeholder-gray-300 focus:ring-0 p-0" />
+
+  <!-- Barra de formato simple -->
+  <div class="flex items-center gap-1 py-2 border-t border-b border-gray-100">
+    <button type="button" onclick="fmt('bold')" title="Negrita"
+            class="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-sm font-black text-gray-700 transition-colors">B</button>
+    <button type="button" onclick="fmt('italic')" title="Cursiva"
+            class="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-sm italic text-gray-700 transition-colors">i</button>
+    <button type="button" onclick="fmt('underline')" title="Subrayado"
+            class="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-sm underline text-gray-700 transition-colors">u</button>
+    <div class="w-px h-5 bg-gray-200 mx-1"></div>
+    <button type="button" onclick="insertList('- ')" title="Lista"
+            class="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors">
+      <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+      </svg>
+    </button>
+    {% if note %}
+    <div class="ml-auto flex items-center gap-2">
+      {% if note.is_shared %}
+      <span class="text-xs text-green-600 font-semibold flex items-center gap-1">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.172-4.243a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+        </svg>
+        Compartida
+      </span>
+      {% endif %}
+      <span class="text-xs text-gray-400">Guardado: {{ note.updated_at|date:"d M Y, H:i" }}</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Área de contenido -->
+  <textarea name="content" id="note-content" rows="20"
+            placeholder="Escribe tu nota aquí…"
+            class="w-full text-gray-800 text-sm leading-relaxed bg-transparent border-none outline-none
+                   resize-none focus:ring-0 p-0 font-mono">{{ note.content|default:'' }}</textarea>
+
+  <!-- Botones -->
+  <div class="flex items-center gap-3 pt-4 border-t border-gray-100 flex-wrap">
+    <button type="submit"
+            class="bg-gray-900 text-white font-bold px-8 py-3 rounded-full hover:bg-gray-700 transition-colors text-sm">
+      {% if note %}Guardar cambios{% else %}Crear nota{% endif %}
+    </button>
+    <a href="{% if folder %}{% url 'courses:my_docs_folder' folder.pk %}{% else %}{% url 'courses:my_docs' %}{% endif %}"
+       class="text-sm text-gray-400 hover:text-gray-700 transition-colors">
+      Cancelar
+    </a>
+
+    {% if note %}
+    <div class="ml-auto flex items-center gap-2">
+      {% if note.is_shared %}
+      <!-- Nota ya compartida: mostrar URL + botón revocar -->
+      <div class="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
+        <svg class="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.172-4.243a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+        </svg>
+        <span id="share-url" class="text-xs text-green-700 font-medium max-w-xs truncate">
+          {{ request.scheme }}://{{ request.get_host }}{% url 'courses:public_note' note.share_token %}
+        </span>
+        <button type="button" onclick="copyShareUrl()"
+                class="text-xs font-bold text-green-700 hover:text-green-900 flex-shrink-0 transition-colors">
+          Copiar
+        </button>
+        <a href="{% url 'courses:public_note' note.share_token %}" target="_blank"
+           class="text-xs font-bold text-green-600 hover:text-green-800 flex-shrink-0 transition-colors">
+          Abrir →
+        </a>
+      </div>
+      <form method="POST" action="{% url 'courses:my_docs_note_share' note.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="disable">
+        <button type="submit"
+                class="text-xs font-semibold text-red-400 hover:text-red-600 transition-colors">
+          Dejar de compartir
+        </button>
+      </form>
+      {% else %}
+      <!-- Nota no compartida -->
+      <form method="POST" action="{% url 'courses:my_docs_note_share' note.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="enable">
+        <button type="submit"
+                class="flex items-center gap-2 border border-gray-200 text-gray-700 font-semibold text-sm px-4 py-2.5 rounded-full hover:bg-gray-50 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+          </svg>
+          Compartir nota
+        </button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+</form>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function fmt(cmd) {
+  document.execCommand(cmd, false, null);
+}
+function insertList(prefix) {
+  var ta = document.getElementById('note-content');
+  var start = ta.selectionStart;
+  var before = ta.value.substring(0, start);
+  var after = ta.value.substring(start);
+  var lineStart = before.lastIndexOf('\n') + 1;
+  ta.value = before.substring(0, lineStart) + prefix + before.substring(lineStart) + after;
+  ta.selectionStart = ta.selectionEnd = start + prefix.length;
+  ta.focus();
+}
+// Auto-save con Ctrl+S
+document.addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    e.target.closest('form') && e.target.closest('form').submit();
+    document.querySelector('form').submit();
+  }
+});
+function copyShareUrl() {
+  var el = document.getElementById('share-url');
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent.trim()).then(function() {
+    var btn = event.target;
+    var orig = btn.textContent;
+    btn.textContent = '✓ Copiado';
+    setTimeout(function() { btn.textContent = orig; }, 1500);
+  });
+}
+</script>
+{% endblock %}
