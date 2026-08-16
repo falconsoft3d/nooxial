@@ -6,7 +6,7 @@ from django.utils.text import slugify
 
 class Category(models.Model):
     name  = models.CharField(max_length=100, verbose_name='Nombre')
-    slug  = models.SlugField(unique=True, blank=True)
+    slug  = models.SlugField(max_length=200, unique=True, blank=True)
     icon  = models.CharField(max_length=10, default='📚', verbose_name='Emoji')
     order = models.PositiveSmallIntegerField(default=0, verbose_name='Orden')
 
@@ -32,7 +32,7 @@ class Course(models.Model):
     ]
 
     title       = models.CharField(max_length=200, verbose_name='Título')
-    slug        = models.SlugField(unique=True, blank=True)
+    slug        = models.SlugField(max_length=200, unique=True, blank=True)
     description = models.TextField(verbose_name='Descripción')
     category    = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True,
                                     related_name='courses', verbose_name='Categoría')
@@ -466,7 +466,7 @@ class DocFile(models.Model):
 
 class Article(models.Model):
     title       = models.CharField(max_length=255, verbose_name='Título')
-    slug        = models.SlugField(unique=True, blank=True)
+    slug        = models.SlugField(max_length=200, unique=True, blank=True)
     summary     = models.TextField(blank=True, verbose_name='Resumen')
     content     = models.TextField(verbose_name='Contenido')
     cover_image = models.ImageField(
