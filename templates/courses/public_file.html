@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ file.name }} – Nooxial{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-gray-50 py-12 px-4">
+  <div class="max-w-2xl mx-auto">
+
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+      <div class="flex items-start gap-4">
+        <div class="w-14 h-14 rounded-2xl bg-brand-50 flex items-center justify-center flex-shrink-0">
+          <svg class="w-7 h-7 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <h1 class="text-xl font-bold text-gray-900 break-all">{{ file.name }}</h1>
+          <p class="text-sm text-gray-400 mt-1">
+            Compartido por <strong>{{ file.user.get_full_name|default:file.user.username }}</strong>
+            · {{ file.view_count }} apertura{{ file.view_count|pluralize:"s" }}
+          </p>
+        </div>
+      </div>
+
+      <div class="mt-6 flex gap-3">
+        <a href="{{ file.file.url }}" download="{{ file.name }}"
+           class="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-700 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          Descargar
+        </a>
+        <a href="{{ file.file.url }}" target="_blank"
+           class="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-colors">
+          Abrir →
+        </a>
+      </div>
+
+      {% with ext=file.extension %}
+      {% if ext in "jpg jpeg png gif webp" %}
+      <div class="mt-6 rounded-xl overflow-hidden border border-gray-100">
+        <img src="{{ file.file.url }}" alt="{{ file.name }}" class="w-full object-contain max-h-[70vh]">
+      </div>
+      {% elif ext == "pdf" %}
+      <div class="mt-6 rounded-xl overflow-hidden border border-gray-100" style="height:70vh;">
+        <iframe src="{{ file.file.url }}" class="w-full h-full border-0" title="{{ file.name }}"></iframe>
+      </div>
+      {% elif ext in "mp4 webm ogg" %}
+      <div class="mt-6 rounded-xl overflow-hidden">
+        <video controls class="w-full rounded-xl">
+          <source src="{{ file.file.url }}">
+        </video>
+      </div>
+      {% endif %}
+      {% endwith %}
+    </div>
+
+    <p class="text-center text-xs text-gray-300 mt-6">Compartido a través de Nooxial</p>
+  </div>
+</div>
+{% endblock %}

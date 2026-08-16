@@ -706,14 +706,15 @@ def teacher_thread(request, student_id):
 
 @login_required
 def my_docs(request, folder_id=None):
-    from courses.models import UserFolder, UserFile, UserNote
+    from courses.models import UserFolder, UserFile, UserNote, UserWhiteboard
     current = None
     if folder_id:
         current = get_object_or_404(UserFolder, pk=folder_id, user=request.user)
 
-    subfolders = UserFolder.objects.filter(user=request.user, parent=current).order_by('name')
-    files      = UserFile.objects.filter(user=request.user, folder=current) if current else []
-    notes      = UserNote.objects.filter(user=request.user, folder=current) if current else []
+    subfolders   = UserFolder.objects.filter(user=request.user, parent=current).order_by('name')
+    files        = UserFile.objects.filter(user=request.user, folder=current) if current else []
+    notes        = UserNote.objects.filter(user=request.user, folder=current) if current else []
+    whiteboards  = UserWhiteboard.objects.filter(user=request.user, folder=current) if current else []
     root_folders = UserFolder.objects.filter(user=request.user, parent=None).order_by('name')
 
     return render(request, 'courses/my_docs.html', {
@@ -722,6 +723,7 @@ def my_docs(request, folder_id=None):
         'subfolders':    subfolders,
         'files':         files,
         'notes':         notes,
+        'whiteboards':   whiteboards,
         'root_folders':  root_folders,
         'breadcrumb':    current.breadcrumb() if current else [],
     })
@@ -886,3 +888,136 @@ def my_docs_record_upload(request):
     file_obj.file.save(filename, recording, save=True)
 
     return JsonResponse({'ok': True, 'name': filename})
+
+
+# ─── COMPARTIR ARCHIVOS Y CARPETAS ───────────────────────────────
+
+@login_required
+@require_POST
+def my_docs_share_file(request, file_id):
+    """Genera o revoca el token de compartir de un archivo."""
+    import uuid as _uuid
+    from courses.models import UserFile
+    f = get_object_or_404(UserFile, pk=file_id, user=request.user)
+    if f.share_token:
+        f.share_token = None
+    else:
+        f.share_token = _uuid.uuid4()
+    f.save(update_fields=['share_token'])
+    return JsonResponse({'ok': True, 'shared': f.share_token is not None,
+                         'token': str(f.share_token) if f.share_token else None})
+
+
+@login_required
+@require_POST
+def my_docs_share_folder(request, folder_id):
+    """Genera o revoca el token de compartir de una carpeta."""
+    import uuid as _uuid
+    from courses.models import UserFolder
+    folder = get_object_or_404(UserFolder, pk=folder_id, user=request.user)
+    if folder.share_token:
+        folder.share_token = None
+    else:
+        folder.share_token = _uuid.uuid4()
+    folder.save(update_fields=['share_token'])
+    return JsonResponse({'ok': True, 'shared': folder.share_token is not None,
+                         'token': str(folder.share_token) if folder.share_token else None})
+
+
+def public_file_view(request, token):
+    """Página pública de un archivo compartido."""
+    from courses.models import UserFile
+    f = get_object_or_404(UserFile, share_token=token)
+    f.view_count = F('view_count') + 1
+    f.save(update_fields=['view_count'])
+    f.refresh_from_db(fields=['view_count'])
+    return render(request, 'courses/public_file.html', {'file': f})
+
+
+def public_folder_view(request, token):
+    """Página pública de una carpeta compartida."""
+    from courses.models import UserFolder
+    folder = get_object_or_404(UserFolder, share_token=token)
+    folder.view_count = F('view_count') + 1
+    folder.save(update_fields=['view_count'])
+    folder.refresh_from_db(fields=['view_count'])
+    files = folder.files.select_related('user').order_by('name')
+    notes = folder.notes.filter(share_token__isnull=False).order_by('title')
+    return render(request, 'courses/public_folder.html', {
+        'folder': folder, 'files': files, 'notes': notes,
+    })
+
+
+# ─── PIZARRAS (WHITEBOARD) ────────────────────────────────────────
+
+@login_required
+def my_docs_whiteboard_new(request, folder_id):
+    from courses.models import UserFolder, UserWhiteboard
+    folder = get_object_or_404(UserFolder, pk=folder_id, user=request.user)
+    wb = UserWhiteboard.objects.create(user=request.user, folder=folder)
+    return redirect('courses:my_docs_whiteboard', whiteboard_id=wb.pk)
+
+
+@login_required
+def my_docs_whiteboard(request, whiteboard_id):
+    from courses.models import UserWhiteboard
+    wb = get_object_or_404(UserWhiteboard, pk=whiteboard_id, user=request.user)
+    return render(request, 'courses/whiteboard.html', {
+        'active_nav': 'my_docs',
+        'wb': wb,
+    })
+
+
+@login_required
+@require_POST
+def my_docs_whiteboard_save(request, whiteboard_id):
+    """Guardar datos JSON de la pizarra (AJAX)."""
+    import json
+    from courses.models import UserWhiteboard
+    wb = get_object_or_404(UserWhiteboard, pk=whiteboard_id, user=request.user)
+    try:
+        body = json.loads(request.body)
+    except Exception:
+        return JsonResponse({'ok': False}, status=400)
+    title = body.get('title', '').strip() or 'Pizarra sin título'
+    data  = body.get('data', '')
+    wb.title = title
+    wb.data  = data if isinstance(data, str) else json.dumps(data)
+    wb.save(update_fields=['title', 'data', 'updated_at'])
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@require_POST
+def my_docs_whiteboard_delete(request, whiteboard_id):
+    from courses.models import UserWhiteboard
+    wb = get_object_or_404(UserWhiteboard, pk=whiteboard_id, user=request.user)
+    folder_id = wb.folder_id
+    wb.delete()
+    if folder_id:
+        return redirect('courses:my_docs_folder', folder_id=folder_id)
+    return redirect('courses:my_docs')
+
+
+@login_required
+@require_POST
+def my_docs_whiteboard_share(request, whiteboard_id):
+    import uuid as _uuid
+    from courses.models import UserWhiteboard
+    wb = get_object_or_404(UserWhiteboard, pk=whiteboard_id, user=request.user)
+    if wb.share_token:
+        wb.share_token = None
+    else:
+        wb.share_token = _uuid.uuid4()
+    wb.save(update_fields=['share_token'])
+    return JsonResponse({'ok': True, 'shared': wb.share_token is not None,
+                         'token': str(wb.share_token) if wb.share_token else None})
+
+
+def public_whiteboard_view(request, token):
+    from courses.models import UserWhiteboard
+    wb = get_object_or_404(UserWhiteboard, share_token=token)
+    wb.view_count = F('view_count') + 1
+    wb.save(update_fields=['view_count'])
+    wb.refresh_from_db(fields=['view_count'])
+    return render(request, 'courses/public_whiteboard.html', {'wb': wb})

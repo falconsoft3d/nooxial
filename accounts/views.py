@@ -194,12 +194,17 @@ def profile_view(request):
         elif form_type == 'cv':
             profile.cv_headline   = request.POST.get('cv_headline', '').strip()
             profile.cv_phone      = request.POST.get('cv_phone', '').strip()
+            profile.cv_linkedin   = request.POST.get('cv_linkedin', '').strip()
+            profile.cv_instagram  = request.POST.get('cv_instagram', '').strip()
+            profile.cv_facebook   = request.POST.get('cv_facebook', '').strip()
+            profile.cv_tiktok     = request.POST.get('cv_tiktok', '').strip()
             profile.cv_summary    = request.POST.get('cv_summary', '').strip()
             profile.cv_experience = request.POST.get('cv_experience', '').strip()
             profile.cv_education  = request.POST.get('cv_education', '').strip()
             profile.cv_skills     = request.POST.get('cv_skills', '').strip()
             profile.cv_public     = request.POST.get('cv_public') == '1'
-            profile.save(update_fields=['cv_headline','cv_phone','cv_summary','cv_experience',
+            profile.save(update_fields=['cv_headline','cv_phone','cv_linkedin','cv_instagram',
+                                        'cv_facebook','cv_tiktok','cv_summary','cv_experience',
                                         'cv_education','cv_skills','cv_public'])
             messages.success(request, 'Currículum actualizado.')
 

@@ -1,0 +1,159 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ wb.title }} – Pizarra – Nooxial{% endblock %}
+
+{% block extra_head %}
+<!-- Excalidraw CSS (obligatorio para que el toolbar sea visible) -->
+<link rel="stylesheet" href="https://unpkg.com/@excalidraw/excalidraw@0.17.6/dist/excalidraw.min.css">
+<style>
+  #excalidraw-wrapper { width: 100%; height: calc(100vh - 112px); }
+  .excalidraw { height: 100%; }
+  .excalidraw .App-menu { z-index: 10; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Barra de herramientas -->
+<div class="flex items-center justify-between mb-3">
+  <div class="flex items-center gap-3 min-w-0">
+    <a href="{% if wb.folder %}{% url 'courses:my_docs_folder' wb.folder.pk %}{% else %}{% url 'courses:my_docs' %}{% endif %}"
+       class="text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      </svg>
+    </a>
+    <input type="text" id="wb-title" value="{{ wb.title }}"
+           class="text-lg font-bold text-gray-900 bg-transparent border-0 focus:outline-none focus:ring-2 focus:ring-brand-300 rounded-lg px-2 py-1 min-w-0 w-64"
+           placeholder="Título de la pizarra"
+           onblur="saveWb()" onkeydown="if(event.key==='Enter'){this.blur();}">
+  </div>
+  <div class="flex items-center gap-2 flex-shrink-0">
+    <span id="save-status" class="text-xs text-gray-400">Autoguardado</span>
+    <button onclick="saveWb()"
+            class="px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-700 transition-colors">
+      Guardar
+    </button>
+    <button onclick="shareWb()" id="share-btn"
+            class="px-4 py-2 text-sm font-semibold rounded-xl border transition-colors
+                   {% if wb.is_shared %}bg-brand-50 border-brand-200 text-brand-700{% else %}border-gray-200 text-gray-600 hover:bg-gray-50{% endif %}">
+      {% if wb.is_shared %}Compartida ✓{% else %}Compartir{% endif %}
+    </button>
+    <form method="post" action="{% url 'courses:my_docs_whiteboard_delete' wb.pk %}"
+          onsubmit="return confirm('¿Eliminar esta pizarra?')">
+      {% csrf_token %}
+      <button type="submit" class="px-4 py-2 text-sm font-semibold text-red-500 border border-red-100 rounded-xl hover:bg-red-50 transition-colors">
+        Eliminar
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Contenedor de Excalidraw -->
+<div id="excalidraw-wrapper" class="rounded-2xl overflow-hidden border border-gray-200 shadow-sm"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- React + ReactDOM + Excalidraw desde CDN (versión fija) -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@excalidraw/excalidraw@0.17.6/dist/excalidraw.production.min.js"></script>
+
+<script>
+var WB_ID   = {{ wb.pk }};
+var CSRF    = document.querySelector('[name=csrfmiddlewaretoken]').value;
+var SAVE_URL   = '/dashboard/mis-docs/pizarra/' + WB_ID + '/guardar/';
+var SHARE_URL  = '/dashboard/mis-docs/pizarra/' + WB_ID + '/compartir/';
+var excalidrawAPI = null;
+var saveTimer     = null;
+var initialData   = null;
+
+try {
+  var raw = {{ wb.data|default:'""'|safe }};
+  if (raw && typeof raw === 'object') initialData = raw;
+  else if (raw && typeof raw === 'string' && raw.trim()) initialData = JSON.parse(raw);
+} catch(e) { initialData = null; }
+
+// Montar Excalidraw
+(function mount() {
+  var ExcalidrawComponent = ExcalidrawLib.Excalidraw;
+  var root = ReactDOM.createRoot(document.getElementById('excalidraw-wrapper'));
+
+  function App() {
+    return React.createElement(ExcalidrawComponent, {
+      initialData: initialData || { elements: [], appState: { viewBackgroundColor: '#ffffff' } },
+      excalidrawAPI: function(api) { excalidrawAPI = api; },
+      onChange: function(elements, appState) {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(autoSave, 3000);
+      },
+      langCode: 'es-ES',
+      UIOptions: {
+        canvasActions: { changeViewBackgroundColor: true, clearCanvas: true, loadScene: false, saveToActiveFile: false, export: false, saveAsImage: true },
+        tools: { image: false },
+      },
+    });
+  }
+  root.render(React.createElement(App));
+})();
+
+function getWbData() {
+  if (!excalidrawAPI) return null;
+  return {
+    elements: excalidrawAPI.getSceneElements(),
+    appState: { viewBackgroundColor: excalidrawAPI.getAppState().viewBackgroundColor || '#ffffff' },
+    files:    excalidrawAPI.getFiles(),
+  };
+}
+
+function autoSave() {
+  var data = getWbData();
+  if (!data) return;
+  document.getElementById('save-status').textContent = 'Guardando…';
+  fetch(SAVE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify({ title: document.getElementById('wb-title').value, data: JSON.stringify(data) }),
+  }).then(r => r.json()).then(function(d) {
+    document.getElementById('save-status').textContent = d.ok ? 'Guardado' : 'Error';
+    setTimeout(function() { document.getElementById('save-status').textContent = 'Autoguardado'; }, 2000);
+  }).catch(function() { document.getElementById('save-status').textContent = 'Error de red'; });
+}
+
+function saveWb() { clearTimeout(saveTimer); autoSave(); }
+
+function shareWb() {
+  fetch(SHARE_URL, { method: 'POST', headers: { 'X-CSRFToken': CSRF } })
+    .then(r => r.json()).then(function(data) {
+      var btn = document.getElementById('share-btn');
+      if (data.shared && data.token) {
+        var url = location.origin + '/dashboard/pizarra/' + data.token + '/';
+        btn.textContent = 'Compartida ✓';
+        btn.className = btn.className.replace('border-gray-200 text-gray-600 hover:bg-gray-50',
+                                              'bg-brand-50 border-brand-200 text-brand-700');
+        navigator.clipboard.writeText(url).catch(function(){});
+        showToast('Enlace copiado: ' + url);
+      } else {
+        btn.textContent = 'Compartir';
+        btn.className = btn.className.replace('bg-brand-50 border-brand-200 text-brand-700',
+                                              'border-gray-200 text-gray-600 hover:bg-gray-50');
+      }
+    });
+}
+
+function showToast(msg) {
+  var t = document.getElementById('wb-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'wb-toast';
+    t.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs font-semibold px-5 py-3 rounded-2xl shadow-2xl z-[9999]';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(t._tid);
+  t._tid = setTimeout(function() { t.style.display = 'none'; }, 4000);
+}
+
+// Guardar antes de salir
+window.addEventListener('beforeunload', function() { clearTimeout(saveTimer); autoSave(); });
+</script>
+{% endblock %}

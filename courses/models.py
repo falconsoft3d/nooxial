@@ -568,6 +568,8 @@ class UserFolder(models.Model):
                                    related_name='children')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    share_token = models.UUIDField(null=True, blank=True, unique=True, verbose_name='Token de compartir')
+    view_count  = models.PositiveIntegerField(default=0, verbose_name='Aperturas')
 
     class Meta:
         verbose_name        = 'Carpeta personal'
@@ -577,6 +579,10 @@ class UserFolder(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def is_shared(self):
+        return self.share_token is not None
 
     def breadcrumb(self):
         crumbs = []
@@ -593,6 +599,8 @@ class UserFile(models.Model):
     name       = models.CharField(max_length=255, verbose_name='Nombre')
     file       = models.FileField(upload_to='user_docs/', verbose_name='Archivo')
     created_at = models.DateTimeField(auto_now_add=True)
+    share_token = models.UUIDField(null=True, blank=True, unique=True, verbose_name='Token de compartir')
+    view_count  = models.PositiveIntegerField(default=0, verbose_name='Aperturas')
 
     class Meta:
         verbose_name        = 'Archivo personal'
@@ -601,6 +609,10 @@ class UserFile(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def is_shared(self):
+        return self.share_token is not None
 
     @property
     def extension(self):
@@ -620,6 +632,37 @@ class UserNote(models.Model):
     class Meta:
         verbose_name        = 'Nota personal'
         verbose_name_plural = 'Notas personales'
+        ordering            = ['-updated_at']
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def is_shared(self):
+        return self.share_token is not None
+
+
+# ─── PIZARRAS (WHITEBOARD) ────────────────────────────────────────
+
+class UserWhiteboard(models.Model):
+    folder      = models.ForeignKey(
+        UserFolder, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='whiteboards', verbose_name='Carpeta'
+    )
+    user        = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='my_whiteboards', verbose_name='Usuario'
+    )
+    title       = models.CharField(max_length=255, default='Pizarra sin título', verbose_name='Título')
+    data        = models.TextField(blank=True, default='', verbose_name='Datos JSON')
+    share_token = models.UUIDField(null=True, blank=True, unique=True, verbose_name='Token público')
+    view_count  = models.PositiveIntegerField(default=0, verbose_name='Aperturas')
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = 'Pizarra'
+        verbose_name_plural = 'Pizarras'
         ordering            = ['-updated_at']
 
     def __str__(self):
