@@ -1694,9 +1694,45 @@ def admin_config(request):
         messages.success(request, 'Configuración guardada correctamente.')
         return redirect('accounts:admin_config')
 
+    # ── Estadísticas del servidor ─────────────────────────────────
+    import shutil, os, platform
+    server_stats = {}
+    try:
+        # Disco
+        disk = shutil.disk_usage('/')
+        server_stats['disk_total']   = round(disk.total / 1024**3, 1)
+        server_stats['disk_used']    = round(disk.used  / 1024**3, 1)
+        server_stats['disk_free']    = round(disk.free  / 1024**3, 1)
+        server_stats['disk_percent'] = round(disk.used  / disk.total * 100, 1)
+        # RAM (Linux /proc/meminfo)
+        with open('/proc/meminfo') as f:
+            mem = {line.split(':')[0]: int(line.split(':')[1].strip().split()[0])
+                   for line in f if ':' in line}
+        total_mb = mem.get('MemTotal', 0) // 1024
+        avail_mb = mem.get('MemAvailable', 0) // 1024
+        used_mb  = total_mb - avail_mb
+        server_stats['ram_total']   = total_mb
+        server_stats['ram_used']    = used_mb
+        server_stats['ram_free']    = avail_mb
+        server_stats['ram_percent'] = round(used_mb / total_mb * 100, 1) if total_mb else 0
+        # CPU load (promedio 1 min)
+        load1, load5, load15 = os.getloadavg()
+        cpu_count = os.cpu_count() or 1
+        server_stats['cpu_load1']   = round(load1, 2)
+        server_stats['cpu_load5']   = round(load5, 2)
+        server_stats['cpu_load15']  = round(load15, 2)
+        server_stats['cpu_count']   = cpu_count
+        server_stats['cpu_percent'] = round(load1 / cpu_count * 100, 1)
+        # SO y Python
+        server_stats['platform'] = platform.platform()
+        server_stats['python']   = platform.python_version()
+    except Exception:
+        pass
+
     return render(request, 'accounts/admin_config.html', {
-        'active_nav': 'admin_config',
-        'config':     config,
+        'active_nav':   'admin_config',
+        'config':       config,
+        'server_stats': server_stats,
     })
 
 
