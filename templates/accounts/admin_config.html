@@ -15,6 +15,9 @@
 </div>
 {% endif %}
 
+<div class="flex gap-6 items-start">
+<!-- ── COLUMNA IZQUIERDA: Formulario ─────────────────────────── -->
+<div class="flex-1 min-w-0">
 <form method="post" class="max-w-xl space-y-5">
   {% csrf_token %}
 
@@ -203,66 +206,64 @@
   <!-- Resultado del test -->
   <div id="test-result" class="hidden mt-3 px-4 py-3 rounded-xl text-sm font-medium"></div>
 </form>
+</div><!-- fin columna izquierda -->
 
+<!-- ── COLUMNA DERECHA: Estadísticas del servidor ────────────── -->
 {% if server_stats %}
-<!-- ── ESTADÍSTICAS DEL SERVIDOR ───────────────────────────────── -->
-<div class="bg-white rounded-2xl border border-gray-100 mt-6 p-6">
-  <h2 class="text-sm font-bold text-gray-900 mb-4">Estadísticas del servidor</h2>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+<div class="w-72 flex-shrink-0 sticky top-6 space-y-3">
+  <p class="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Servidor</p>
 
-    <!-- Disco -->
-    <div class="bg-gray-50 rounded-xl p-4">
-      <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Disco</p>
-      <p class="text-2xl font-black text-gray-900">{{ server_stats.disk_percent }}%</p>
-      <div class="w-full bg-gray-200 rounded-full h-1.5 mt-2">
-        <div class="bg-brand-500 h-1.5 rounded-full" style="width:{{ server_stats.disk_percent }}%"></div>
-      </div>
-      <p class="text-xs text-gray-500 mt-2">
-        Usado: <strong>{{ server_stats.disk_used }} GB</strong> /
-        Total: {{ server_stats.disk_total }} GB
-      </p>
-      <p class="text-xs text-green-600 font-semibold mt-0.5">Libre: {{ server_stats.disk_free }} GB</p>
+  <!-- Disco -->
+  <div class="bg-white rounded-2xl border border-gray-100 p-4">
+    <div class="flex items-center justify-between mb-2">
+      <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Disco</p>
+      <span class="text-sm font-black text-gray-900">{{ server_stats.disk_percent }}%</span>
     </div>
-
-    <!-- RAM -->
-    <div class="bg-gray-50 rounded-xl p-4">
-      <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Memoria RAM</p>
-      <p class="text-2xl font-black text-gray-900">{{ server_stats.ram_percent }}%</p>
-      <div class="w-full bg-gray-200 rounded-full h-1.5 mt-2">
-        <div class="{% if server_stats.ram_percent > 85 %}bg-red-500{% elif server_stats.ram_percent > 65 %}bg-amber-500{% else %}bg-brand-500{% endif %} h-1.5 rounded-full"
-             style="width:{{ server_stats.ram_percent }}%"></div>
-      </div>
-      <p class="text-xs text-gray-500 mt-2">
-        Usado: <strong>{{ server_stats.ram_used }} MB</strong> /
-        Total: {{ server_stats.ram_total }} MB
-      </p>
-      <p class="text-xs text-green-600 font-semibold mt-0.5">Libre: {{ server_stats.ram_free }} MB</p>
+    <div class="w-full bg-gray-100 rounded-full h-1.5 mb-2">
+      <div class="bg-brand-500 h-1.5 rounded-full" style="width:{{ server_stats.disk_percent }}%"></div>
     </div>
+    <p class="text-xs text-gray-500">Usado <strong>{{ server_stats.disk_used }} GB</strong> de {{ server_stats.disk_total }} GB</p>
+    <p class="text-xs text-green-600 font-semibold">Libre: {{ server_stats.disk_free }} GB</p>
+  </div>
 
-    <!-- CPU -->
-    <div class="bg-gray-50 rounded-xl p-4">
-      <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">CPU ({{ server_stats.cpu_count }} núcleos)</p>
-      <p class="text-2xl font-black text-gray-900">{{ server_stats.cpu_percent }}%</p>
-      <div class="w-full bg-gray-200 rounded-full h-1.5 mt-2">
-        <div class="{% if server_stats.cpu_percent > 80 %}bg-red-500{% elif server_stats.cpu_percent > 60 %}bg-amber-500{% else %}bg-brand-500{% endif %} h-1.5 rounded-full"
-             style="width:{% if server_stats.cpu_percent > 100 %}100{% else %}{{ server_stats.cpu_percent }}{% endif %}%"></div>
-      </div>
-      <p class="text-xs text-gray-500 mt-2">
-        Load avg: <strong>{{ server_stats.cpu_load1 }}</strong> / {{ server_stats.cpu_load5 }} / {{ server_stats.cpu_load15 }}
-      </p>
-      <p class="text-xs text-gray-400 mt-0.5">(1 / 5 / 15 min)</p>
+  <!-- RAM -->
+  <div class="bg-white rounded-2xl border border-gray-100 p-4">
+    <div class="flex items-center justify-between mb-2">
+      <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Memoria RAM</p>
+      <span class="text-sm font-black {% if server_stats.ram_percent > 85 %}text-red-600{% elif server_stats.ram_percent > 65 %}text-amber-600{% else %}text-gray-900{% endif %}">{{ server_stats.ram_percent }}%</span>
     </div>
-
-    <!-- Sistema -->
-    <div class="bg-gray-50 rounded-xl p-4">
-      <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Sistema</p>
-      <p class="text-xs text-gray-700 font-semibold mt-2">Python {{ server_stats.python }}</p>
-      <p class="text-xs text-gray-500 mt-1 break-all leading-relaxed">{{ server_stats.platform }}</p>
+    <div class="w-full bg-gray-100 rounded-full h-1.5 mb-2">
+      <div class="{% if server_stats.ram_percent > 85 %}bg-red-500{% elif server_stats.ram_percent > 65 %}bg-amber-500{% else %}bg-brand-500{% endif %} h-1.5 rounded-full"
+           style="width:{{ server_stats.ram_percent }}%"></div>
     </div>
+    <p class="text-xs text-gray-500">Usado <strong>{{ server_stats.ram_used }} MB</strong> de {{ server_stats.ram_total }} MB</p>
+    <p class="text-xs text-green-600 font-semibold">Libre: {{ server_stats.ram_free }} MB</p>
+  </div>
 
+  <!-- CPU -->
+  <div class="bg-white rounded-2xl border border-gray-100 p-4">
+    <div class="flex items-center justify-between mb-2">
+      <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">CPU ({{ server_stats.cpu_count }} núcleos)</p>
+      <span class="text-sm font-black {% if server_stats.cpu_percent > 80 %}text-red-600{% elif server_stats.cpu_percent > 60 %}text-amber-600{% else %}text-gray-900{% endif %}">{{ server_stats.cpu_percent }}%</span>
+    </div>
+    <div class="w-full bg-gray-100 rounded-full h-1.5 mb-2">
+      <div class="{% if server_stats.cpu_percent > 80 %}bg-red-500{% elif server_stats.cpu_percent > 60 %}bg-amber-500{% else %}bg-brand-500{% endif %} h-1.5 rounded-full"
+           style="width:{% if server_stats.cpu_percent > 100 %}100{% else %}{{ server_stats.cpu_percent }}{% endif %}%"></div>
+    </div>
+    <p class="text-xs text-gray-500">Load avg: <strong>{{ server_stats.cpu_load1 }}</strong> / {{ server_stats.cpu_load5 }} / {{ server_stats.cpu_load15 }}</p>
+    <p class="text-xs text-gray-400">(1 / 5 / 15 min)</p>
+  </div>
+
+  <!-- Sistema -->
+  <div class="bg-white rounded-2xl border border-gray-100 p-4">
+    <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Sistema</p>
+    <p class="text-xs text-gray-700 font-semibold">Python {{ server_stats.python }}</p>
+    <p class="text-xs text-gray-400 mt-1 break-all leading-relaxed">{{ server_stats.platform }}</p>
   </div>
 </div>
 {% endif %}
+
+</div><!-- fin flex container -->
 
 {% block extra_scripts %}
 <script>
