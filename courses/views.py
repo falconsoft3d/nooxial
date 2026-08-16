@@ -144,7 +144,18 @@ def course_list(request):
 
 
 def course_detail(request, slug):
-    course = get_object_or_404(Course, slug=slug, is_published=True)
+    course = get_object_or_404(Course, slug=slug)
+    # Solo el instructor o usuarios con acceso pueden ver cursos no publicados
+    if not course.is_published:
+        is_instructor = request.user.is_authenticated and (
+            course.instructor == request.user or request.user.is_staff
+        )
+        is_enrolled = request.user.is_authenticated and Enrollment.objects.filter(
+            student=request.user, course=course
+        ).exists()
+        if not (is_instructor or is_enrolled):
+            from django.http import Http404
+            raise Http404
     topics = (course.topics
               .filter(is_active=True)
               .prefetch_related(
