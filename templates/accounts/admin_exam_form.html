@@ -102,24 +102,27 @@
             </div>
             <div class="space-y-2">
               <div class="flex items-center gap-3">
-                <input type="radio" name="correct[]" value="A" {% if q.correct == 'A' %}checked{% endif %} class="text-brand-500">
+                <input type="radio" name="correct_q{{ forloop.counter }}" value="A" {% if q.correct == 'A' %}checked{% endif %} class="text-brand-500 q-correct-radio" onchange="syncCorrect(this)">
                 <span class="text-xs font-bold text-gray-400 w-5">A</span>
                 <input type="text" name="option_a[]" value="{{ q.a }}" placeholder="Opción A" required
                        class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300">
               </div>
               <div class="flex items-center gap-3">
-                <input type="radio" name="correct[]" value="B" {% if q.correct == 'B' %}checked{% endif %} class="text-brand-500">
+                <input type="radio" name="correct_q{{ forloop.counter }}" value="B" {% if q.correct == 'B' %}checked{% endif %} class="text-brand-500 q-correct-radio" onchange="syncCorrect(this)">
                 <span class="text-xs font-bold text-gray-400 w-5">B</span>
                 <input type="text" name="option_b[]" value="{{ q.b }}" placeholder="Opción B" required
                        class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300">
               </div>
               <div class="flex items-center gap-3">
-                <input type="radio" name="correct[]" value="C" {% if q.correct == 'C' %}checked{% endif %} class="text-brand-500">
+                <input type="radio" name="correct_q{{ forloop.counter }}" value="C" {% if q.correct == 'C' %}checked{% endif %} class="text-brand-500 q-correct-radio" onchange="syncCorrect(this)">
+              
                 <span class="text-xs font-bold text-gray-400 w-5">C</span>
                 <input type="text" name="option_c[]" value="{{ q.c }}" placeholder="Opción C" required
                        class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300">
               </div>
             </div>
+            <!-- Hidden que recoge la respuesta correcta para enviar al servidor -->
+            <input type="hidden" name="correct[]" class="correct-hidden" value="{{ q.correct|default:'A' }}">
           </div>
           {% endfor %}
         {% endif %}
@@ -168,24 +171,25 @@
     </div>
     <div class="options-block space-y-2">
       <div class="flex items-center gap-3">
-        <input type="radio" name="correct[]" value="A" checked class="text-brand-500">
+        <input type="radio" name="correct[]" value="A" checked class="text-brand-500 q-correct-radio" onchange="syncCorrect(this)">
         <span class="text-xs font-bold text-gray-400 w-5">A</span>
         <input type="text" name="option_a[]" placeholder="Opción A" required
                class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300">
       </div>
       <div class="flex items-center gap-3">
-        <input type="radio" name="correct[]" value="B" class="text-brand-500">
+        <input type="radio" name="correct[]" value="B" class="text-brand-500 q-correct-radio" onchange="syncCorrect(this)">
         <span class="text-xs font-bold text-gray-400 w-5">B</span>
         <input type="text" name="option_b[]" placeholder="Opción B" required
                class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300">
       </div>
       <div class="flex items-center gap-3">
-        <input type="radio" name="correct[]" value="C" class="text-brand-500">
+        <input type="radio" name="correct[]" value="C" class="text-brand-500 q-correct-radio" onchange="syncCorrect(this)">
         <span class="text-xs font-bold text-gray-400 w-5">C</span>
         <input type="text" name="option_c[]" placeholder="Opción C" required
                class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300">
       </div>
     </div>
+    <input type="hidden" name="correct[]" class="correct-hidden" value="A">
     <p class="upload-hint hidden text-xs text-brand-600 font-medium mt-2">📎 El estudiante sube un archivo — se marca automáticamente correcta.</p>
   </div>
 </template>
@@ -207,8 +211,19 @@ function toggleQuestionOptions(sel) {
 }
 function addQuestion() {
   const tmpl = document.getElementById('question-template').content.cloneNode(true);
+  // Asignar índice único a los radios de esta pregunta
+  const idx = Date.now();
+  tmpl.querySelectorAll('input[type=radio]').forEach(r => { r.name = 'correct_' + idx; });
   document.getElementById('questions-container').appendChild(tmpl);
   document.getElementById('no-questions').classList.add('hidden');
+}
+// Sincroniza el radio seleccionado con el hidden que lee el servidor
+function syncCorrect(radio) {
+  const block = radio.closest('.question-block');
+  if (block) {
+    const hidden = block.querySelector('.correct-hidden');
+    if (hidden) hidden.value = radio.value;
+  }
 }
 function removeQuestion(btn) {
   btn.closest('.question-block').remove();

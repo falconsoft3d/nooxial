@@ -262,11 +262,10 @@
                 </svg>
               </button>
 
-              <!-- CHECK: marcar/desmarcar (siempre visible a la derecha) -->
-              <form method="post" action="{% url 'courses:toggle_lesson' course.slug lesson.id %}"
-                    class="flex-shrink-0">
+              <!-- Botón: Completada (ya vista) o Mostrar (sin ver) -->
+              {% if lesson.id in completed_ids %}
+              <form method="post" action="{% url 'courses:toggle_lesson' course.slug lesson.id %}" class="flex-shrink-0">
                 {% csrf_token %}
-                {% if lesson.id in completed_ids %}
                 <button type="submit" title="Desmarcar clase"
                         class="flex items-center gap-1.5 bg-brand-400 text-white text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-red-400 transition-colors">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -274,16 +273,19 @@
                   </svg>
                   Completada
                 </button>
-                {% else %}
-                <button type="submit" title="Marcar como completada"
-                        class="flex items-center gap-1.5 bg-amber-100 text-amber-700 border border-amber-300 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-brand-300 hover:text-gray-900 hover:border-brand-400 transition-colors">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
-                  </svg>
-                  Completar
-                </button>
-                {% endif %}
               </form>
+              {% else %}
+              <button type="button"
+                      onclick="showLesson('content-{{ lesson.id }}', 'icon-content-{{ lesson.id }}')"
+                      id="show-btn-{{ lesson.id }}"
+                      class="flex items-center gap-1.5 bg-gray-100 text-gray-700 border border-gray-200 text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-brand-100 hover:text-brand-800 hover:border-brand-300 transition-colors flex-shrink-0">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Mostrar
+              </button>
+              {% endif %}
             </div>
 
             <!-- Contenido expandido -->
@@ -305,6 +307,20 @@
 
               {% if lesson.content %}
               <div class="text-sm text-gray-700 leading-relaxed mb-3 whitespace-pre-line">{{ lesson.content }}</div>
+              {% endif %}
+
+              {% if not lesson.id in completed_ids %}
+              <!-- Botón Completar aparece DENTRO del contenido expandido -->
+              <form method="post" action="{% url 'courses:toggle_lesson' course.slug lesson.id %}" class="mt-3">
+                {% csrf_token %}
+                <button type="submit"
+                        class="flex items-center gap-2 bg-amber-100 text-amber-700 border border-amber-300 text-xs font-semibold px-4 py-2 rounded-full hover:bg-brand-300 hover:text-gray-900 hover:border-brand-400 transition-colors">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                  </svg>
+                  Marcar como completada
+                </button>
+              </form>
               {% endif %}
 
               {% if lesson.attachments.all %}
@@ -743,6 +759,16 @@ function toggleLesson(id) {
   const icon = document.getElementById('icon-' + id);
   el.classList.toggle('hidden');
   icon.classList.toggle('rotate-180');
+}
+// Abre el contenido y oculta el botón "Mostrar"
+function showLesson(contentId, iconId) {
+  const el = document.getElementById(contentId);
+  const icon = document.getElementById(iconId);
+  const lessonId = contentId.replace('content-', '');
+  const showBtn = document.getElementById('show-btn-' + lessonId);
+  if (el) { el.classList.remove('hidden'); }
+  if (icon) { icon.classList.add('rotate-180'); }
+  if (showBtn) { showBtn.classList.add('hidden'); }
 }
 function copyText(text, btn) {
   navigator.clipboard.writeText(text).then(function () {
