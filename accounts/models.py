@@ -53,6 +53,7 @@ class UserProfile(models.Model):
     cv_instagram   = models.URLField(blank=True, verbose_name='Instagram')
     cv_facebook    = models.URLField(blank=True, verbose_name='Facebook')
     cv_tiktok      = models.URLField(blank=True, verbose_name='TikTok')
+    cv_github      = models.URLField(blank=True, verbose_name='GitHub')
     cv_summary     = models.TextField(blank=True, verbose_name='Resumen profesional')
     cv_experience  = models.TextField(blank=True, verbose_name='Experiencia laboral')
     cv_education   = models.TextField(blank=True, verbose_name='Formación académica')
