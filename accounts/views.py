@@ -3,7 +3,7 @@ from django.contrib.auth import authenticate, login, logout, update_session_auth
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Max as _Max
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.utils import timezone
@@ -1045,6 +1045,7 @@ def admin_lesson_form(request, lesson_id=None):
         course_id = request.POST.get('course') or None
         topic_id  = request.POST.get('topic') or None
         is_active = request.POST.get('is_active') == 'on'
+        order_val = request.POST.get('order', '').strip()
 
         if not title:
             messages.error(request, 'El título de la clase es obligatorio.')
@@ -1058,6 +1059,8 @@ def admin_lesson_form(request, lesson_id=None):
                 target.course    = course
                 target.topic     = topic
                 target.is_active = is_active
+                if order_val.isdigit():
+                    target.order = int(order_val)
                 if 'video' in request.FILES:
                     if target.video:  # remove old video
                         if os.path.isfile(target.video.path):
@@ -1065,9 +1068,20 @@ def admin_lesson_form(request, lesson_id=None):
                     target.video = request.FILES['video']
                 target.save()
             else:
+                # Auto-calcular el siguiente orden para este curso/topic
+                if order_val.isdigit():
+                    next_order = int(order_val)
+                else:
+                    qs = Lesson.objects.filter(course_id=course_id)
+                    if topic_id:
+                        qs = qs.filter(topic_id=topic_id)
+                    max_order = qs.aggregate(m=_Max('order'))['m'] or 0
+                    next_order = max_order + 1
+
                 target = Lesson.objects.create(
                     title=title, content=content, course=course,
                     topic=topic, is_active=is_active,
+                    order=next_order,
                     video=request.FILES.get('video'),
                 )
 
@@ -1089,6 +1103,7 @@ def admin_lesson_form(request, lesson_id=None):
         'courses':    courses,
         'topics':     topics,
         'attachments': target.attachments.all() if editing else [],
+        'next_order': (Lesson.objects.aggregate(m=_Max('order'))['m'] or 0) + 1 if not editing else None,
     })
 
 

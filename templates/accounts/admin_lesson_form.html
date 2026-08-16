@@ -106,12 +106,22 @@
   <!-- ── FORM ───────────────────────────────────────────────── -->
   <div class="p-6 space-y-5">
 
-    <!-- Título -->
-    <div>
-      <label class="field-label">Título <span class="text-red-400">*</span></label>
-      <input type="text" name="title" value="{{ target.title|default:'' }}"
-             placeholder="Ej: Introducción a la comunicación verbal" required autofocus
-             class="field-input" />
+    <!-- Título + Orden -->
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div class="sm:col-span-3">
+        <label class="field-label">Título <span class="text-red-400">*</span></label>
+        <input type="text" name="title" value="{{ target.title|default:'' }}"
+               placeholder="Ej: Introducción a la comunicación verbal" required autofocus
+               class="field-input" />
+      </div>
+      <div>
+        <label class="field-label">Orden</label>
+        <input type="number" name="order" min="0"
+               value="{{ target.order|default:next_order }}"
+               placeholder="{{ next_order|default:'1' }}"
+               class="field-input text-center font-bold" />
+        <p class="text-xs text-gray-400 mt-1">Determina la posición en el curso</p>
+      </div>
     </div>
 
     <!-- Curso + Temario en fila -->
