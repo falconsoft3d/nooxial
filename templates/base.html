@@ -1,9 +1,12 @@
 <!DOCTYPE html>
+{% load static %}
 <html lang="es" class="scroll-smooth">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}Nooxial{% endblock %}</title>
+  <link rel="icon" type="image/png" href="{% static 'favicon.png' %}">
+  <link rel="shortcut icon" href="{% static 'favicon.png' %}">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
