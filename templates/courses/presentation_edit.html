@@ -1,0 +1,255 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ pres.title }} — Editor de presentación{% endblock %}
+
+{% block dashboard_head %}
+<!-- CodeMirror (editor Markdown) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/theme/dracula.css">
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/addon/edit/closebrackets.js"></script>
+<style>
+  .CodeMirror {
+    height: 100%;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 14px;
+    line-height: 1.7;
+    border-radius: 0;
+  }
+  .editor-wrap { display: flex; flex-direction: column; height: calc(100vh - 64px); }
+  .editor-body { flex: 1; overflow: hidden; position: relative; }
+  .editor-body .CodeMirror { position: absolute; inset: 0; height: 100%; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="editor-wrap">
+
+  <!-- ── Topbar ── -->
+  <div class="flex items-center gap-3 px-4 py-2 bg-gray-950 text-white border-b border-gray-800 flex-shrink-0">
+    <!-- Volver -->
+    {% if pres.folder %}
+    <a href="{% url 'courses:my_docs_folder' pres.folder.pk %}"
+       class="text-gray-400 hover:text-white transition-colors flex-shrink-0">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      </svg>
+    </a>
+    {% endif %}
+
+    <!-- Título editable -->
+    <input id="pres-title" type="text" value="{{ pres.title|escapejs }}"
+           class="flex-1 bg-transparent text-sm font-semibold text-white border-none outline-none placeholder-gray-500"
+           placeholder="Título de la presentación">
+
+    <!-- Separador indicador de guardado -->
+    <span id="save-indicator" class="text-xs text-gray-500 flex-shrink-0"></span>
+
+    <!-- Tema -->
+    <select id="theme-select"
+            class="bg-gray-800 text-gray-300 text-xs rounded-lg px-3 py-1.5 border border-gray-700 focus:outline-none">
+      {% for val, label in themes %}
+      <option value="{{ val }}" {% if pres.theme == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <!-- Separador -->
+    <div class="w-px h-5 bg-gray-700 flex-shrink-0"></div>
+
+    <!-- Separadores de slides (referencia rápida) -->
+    <span class="text-xs text-gray-500 hidden lg:inline">
+      <code class="bg-gray-800 px-1.5 py-0.5 rounded text-purple-300">---</code> slide horizontal &nbsp;
+      <code class="bg-gray-800 px-1.5 py-0.5 rounded text-blue-300">--</code> slide vertical
+    </span>
+
+    <!-- Guardar -->
+    <button onclick="savePresentation()"
+            class="text-xs font-semibold bg-gray-700 hover:bg-gray-600 text-white px-4 py-1.5 rounded-xl transition-colors flex-shrink-0">
+      Guardar
+    </button>
+
+    <!-- Plantilla demo -->
+    <button onclick="insertDemo()"
+            class="text-xs font-semibold border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 px-3 py-1.5 rounded-xl transition-colors flex-shrink-0"
+            title="Insertar plantilla demo">
+      🗂 Demo
+    </button>
+
+    <!-- Presentar (nueva pestaña) -->
+    <a id="btn-present" href="{% url 'courses:my_docs_presentation_present' pres.pk %}" target="_blank"
+       onclick="savePresentation(event)"
+       class="flex items-center gap-1.5 text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white px-4 py-1.5 rounded-xl transition-colors flex-shrink-0">
+      <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M8 5v14l11-7z"/>
+      </svg>
+      Presentar
+    </a>
+
+    <!-- Compartir público -->
+    <button id="btn-share-pres" onclick="toggleSharePres()"
+            data-shared="{{ pres.is_shared|yesno:'true,false' }}"
+            data-token="{{ pres.share_token|default:'' }}"
+            class="text-xs font-semibold px-3 py-1.5 rounded-xl border transition-colors flex-shrink-0
+                   {% if pres.is_shared %}text-green-400 border-green-600 bg-green-900/30{% else %}text-gray-400 border-gray-700 hover:border-gray-500{% endif %}">
+      {% if pres.is_shared %}🔗 Pública{% else %}🔗 Compartir{% endif %}
+    </button>
+  </div>
+
+  <!-- ── Editor CodeMirror ── -->
+  <div class="editor-body">
+    <textarea id="cm-editor">{{ pres.content }}</textarea>
+  </div>
+
+</div>
+
+<script>
+const CSRF = '{{ csrf_token }}';
+const SAVE_URL  = '{% url "courses:my_docs_presentation_edit" pres.pk %}';
+const PRESENT_URL = '{% url "courses:my_docs_presentation_present" pres.pk %}';
+
+// ── CodeMirror init ────────────────────────────────────────────
+var cm = CodeMirror.fromTextArea(document.getElementById('cm-editor'), {
+  mode:          'markdown',
+  theme:         'dracula',
+  lineNumbers:   true,
+  lineWrapping:  true,
+  autoCloseBrackets: true,
+  extraKeys: {
+    'Ctrl-S': function() { savePresentation(); },
+    'Cmd-S':  function() { savePresentation(); },
+  }
+});
+
+// ── Auto-save ─────────────────────────────────────────────────
+var _saveTimer = null;
+cm.on('change', function() {
+  setIndicator('⏳ Sin guardar');
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(savePresentation, 3000);
+});
+
+function setIndicator(msg) {
+  document.getElementById('save-indicator').textContent = msg;
+}
+
+// ── Guardar (AJAX) ────────────────────────────────────────────
+function savePresentation(evt) {
+  if (evt && evt.preventDefault) {
+    // Desde "Presentar": guardar primero, luego abrir
+    evt.preventDefault();
+    var target = '{% url "courses:my_docs_presentation_present" pres.pk %}';
+    doSave().then(function() { window.open(target, '_blank'); });
+    return;
+  }
+  doSave();
+}
+
+function doSave() {
+  var body = new URLSearchParams({
+    csrfmiddlewaretoken: CSRF,
+    title:   document.getElementById('pres-title').value,
+    content: cm.getValue(),
+    theme:   document.getElementById('theme-select').value,
+  });
+  setIndicator('💾 Guardando…');
+  return fetch(SAVE_URL, {
+    method: 'POST',
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: body,
+  }).then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) setIndicator('✓ Guardado');
+    })
+    .catch(function() { setIndicator('⚠ Error al guardar'); });
+}
+
+// ── Plantilla demo ────────────────────────────────────────────
+var DEMO_TEMPLATE = `# Mi Presentación
+### Subtítulo aquí
+
+> Creada con **Nooxial**
+
+---
+
+## Agenda
+
+1. Introducción
+2. Desarrollo
+3. Conclusión
+
+---
+
+## Puntos clave
+
+- Punto **uno** — lo más importante
+- Punto *dos* — complementario
+- Punto \`tres\` — detalle técnico
+
+--
+
+### Profundizando
+
+> Los subslides se crean con \`--\`  
+> Los slides horizontales con \`---\`
+
+---
+
+## Código
+
+\`\`\`python
+def hola_mundo():
+    print("¡Hola desde Nooxial! 🎉")
+    return True
+\`\`\`
+
+---
+
+## Cita
+
+> El conocimiento es poder.
+>
+> — Francis Bacon
+
+---
+
+## ¡Gracias!
+
+### ¿Preguntas?
+
+📧 &nbsp;contacto@tudominio.com`;
+
+function insertDemo() {
+  if (cm.getValue().trim() && !confirm('¿Reemplazar el contenido con la plantilla demo?')) return;
+  cm.setValue(DEMO_TEMPLATE);
+  cm.setCursor({ line: 0, ch: 0 });
+}
+
+// ── Compartir públicamente ────────────────────────────────────
+function toggleSharePres() {
+  var btn  = document.getElementById('btn-share-pres');
+  var fd   = new URLSearchParams({ csrfmiddlewaretoken: CSRF });
+  fetch('{% url "courses:my_docs_presentation_share" pres.pk %}', { method: 'POST', body: fd })
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (!d.ok) return;
+      if (d.shared && d.token) {
+        var url = location.origin + '{% url "courses:public_presentation" "00000000-0000-0000-0000-000000000000" %}'.replace('00000000-0000-0000-0000-000000000000', d.token);
+        btn.dataset.shared = 'true';
+        btn.textContent    = '🔗 Pública';
+        btn.classList.remove('text-gray-400', 'border-gray-700');
+        btn.classList.add('text-green-400', 'border-green-600', 'bg-green-900/30');
+        navigator.clipboard.writeText(url).catch(function(){});
+        alert('¡Enlace copiado!\n' + url);
+      } else {
+        btn.dataset.shared = 'false';
+        btn.textContent    = '🔗 Compartir';
+        btn.classList.remove('text-green-400', 'border-green-600', 'bg-green-900/30');
+        btn.classList.add('text-gray-400', 'border-gray-700');
+      }
+    });
+}
+</script>
+{% endblock %}

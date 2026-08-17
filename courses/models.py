@@ -671,3 +671,137 @@ class UserWhiteboard(models.Model):
     @property
     def is_shared(self):
         return self.share_token is not None
+
+    @property
+    def is_shared(self):
+        return self.share_token is not None
+
+class FolderShare(models.Model):
+    folder       = models.ForeignKey('UserFolder', on_delete=models.CASCADE,
+                                     related_name='direct_shares', verbose_name='Carpeta')
+    shared_by    = models.ForeignKey(User, on_delete=models.CASCADE,
+                                     related_name='folders_shared_out', verbose_name='Compartido por')
+    with_user    = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True,
+                                     related_name='folders_shared_in', verbose_name='Con usuario')
+    with_company = models.ForeignKey('accounts.Company', on_delete=models.CASCADE, null=True, blank=True,
+                                     related_name='shared_folders', verbose_name='Con empresa')
+    created_at   = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = 'Carpeta compartida'
+        verbose_name_plural = 'Carpetas compartidas'
+        ordering            = ['-created_at']
+
+    def __str__(self):
+        target = f'@{self.with_user.username}' if self.with_user_id else str(self.with_company)
+        return f'"{self.folder.name}" → {target}'
+
+
+# ─── PLANTILLA DEMO ─────────────────────────────────────────────────────────────
+
+PRESENTATION_DEMO = """\
+# Mi Presentación
+### Subtítulo aquí
+
+> Creada con **Nooxial**
+
+---
+
+## Agenda
+
+1. Introducción
+2. Desarrollo
+3. Conclusión
+
+---
+
+## Puntos clave
+
+- Punto **uno** — lo más importante
+- Punto *dos* — complementario
+- Punto `tres` — detalle técnico
+
+--
+
+### Profundizando
+
+> Los subslides se crean con `--`  
+> Los slides horizontales con `---`
+
+---
+
+## Código
+
+```python
+def hola_mundo():
+    print("¡Hola desde Nooxial! 🎉")
+    return True
+```
+
+---
+
+## Imagen
+
+![Logo](https://via.placeholder.com/400x200?text=Tu+imagen+aquí)
+
+---
+
+## Cita
+
+> El conocimiento es poder.
+>
+> — Francis Bacon
+
+---
+
+## ¡Gracias!
+
+### ¿Preguntas?
+
+📧 &nbsp;contacto@tudominio.com
+"""
+
+
+# ─── PRESENTACIONES ─────────────────────────────────────────────────────────────
+
+REVEAL_THEMES = [
+    ('black',     'Negro'),
+    ('white',     'Blanco'),
+    ('league',    'League'),
+    ('beige',     'Beige'),
+    ('sky',       'Cielo'),
+    ('night',     'Noche'),
+    ('serif',     'Serif'),
+    ('simple',    'Simple'),
+    ('solarized', 'Solarized'),
+    ('moon',      'Luna'),
+    ('dracula',   'Dracula'),
+]
+
+
+class UserPresentation(models.Model):
+    folder     = models.ForeignKey(
+        UserFolder, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='presentations', verbose_name='Carpeta',
+    )
+    user       = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='my_presentations', verbose_name='Usuario',
+    )
+    title      = models.CharField(max_length=255, default='Presentación sin título',
+                                  verbose_name='Título')
+    content    = models.TextField(blank=True, verbose_name='Contenido Markdown')
+    theme      = models.CharField(max_length=30, default='black',
+                                  choices=REVEAL_THEMES, verbose_name='Tema')
+    share_token = models.UUIDField(null=True, blank=True, unique=True, verbose_name='Token público')
+    view_count  = models.PositiveIntegerField(default=0, verbose_name='Vistas públicas')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = 'Presentación'
+        verbose_name_plural = 'Presentaciones'
+        ordering            = ['-updated_at']
+
+    def __str__(self):
+        return self.title

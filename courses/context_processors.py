@@ -18,3 +18,13 @@ def site_config(request):
     """Inyecta SiteConfig en todos los templates."""
     from accounts.models import SiteConfig
     return {'site_config': SiteConfig.get()}
+
+
+def current_app_version(request):
+    """Inyecta la versión actual de la plataforma."""
+    from accounts.models import AppVersion
+    try:
+        v = AppVersion.objects.filter(is_current=True).first()
+    except Exception:
+        v = None
+    return {'current_app_version': v}

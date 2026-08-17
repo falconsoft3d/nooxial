@@ -718,26 +718,43 @@ def teacher_thread(request, student_id):
 
 @login_required
 def my_docs(request, folder_id=None):
-    from courses.models import UserFolder, UserFile, UserNote, UserWhiteboard
+    from courses.models import UserFolder, UserFile, UserNote, UserWhiteboard, FolderShare, UserPresentation
+    from django.db.models import Q
     current = None
     if folder_id:
         current = get_object_or_404(UserFolder, pk=folder_id, user=request.user)
 
-    subfolders   = UserFolder.objects.filter(user=request.user, parent=current).order_by('name')
-    files        = UserFile.objects.filter(user=request.user, folder=current) if current else []
-    notes        = UserNote.objects.filter(user=request.user, folder=current) if current else []
-    whiteboards  = UserWhiteboard.objects.filter(user=request.user, folder=current) if current else []
-    root_folders = UserFolder.objects.filter(user=request.user, parent=None).order_by('name')
+    subfolders    = UserFolder.objects.filter(user=request.user, parent=current).order_by('name')
+    files         = UserFile.objects.filter(user=request.user, folder=current) if current else []
+    notes         = UserNote.objects.filter(user=request.user, folder=current) if current else []
+    whiteboards   = UserWhiteboard.objects.filter(user=request.user, folder=current) if current else []
+    presentations = UserPresentation.objects.filter(user=request.user, folder=current) if current else []
+    root_folders  = UserFolder.objects.filter(user=request.user, parent=None).order_by('name')
+
+    # Carpetas compartidas conmigo (solo en la raíz)
+    shared_folders = []
+    if not current:
+        try:
+            company = request.user.profile.company
+        except Exception:
+            company = None
+        shared_folders = (FolderShare.objects
+                          .filter(Q(with_user=request.user) |
+                                  (Q(with_company=company) if company else Q(pk__in=[])))
+                          .select_related('folder', 'folder__user', 'shared_by')
+                          .order_by('folder__name'))
 
     return render(request, 'courses/my_docs.html', {
-        'active_nav':    'my_docs',
-        'current':       current,
-        'subfolders':    subfolders,
-        'files':         files,
-        'notes':         notes,
-        'whiteboards':   whiteboards,
-        'root_folders':  root_folders,
-        'breadcrumb':    current.breadcrumb() if current else [],
+        'active_nav':     'my_docs',
+        'current':        current,
+        'subfolders':     subfolders,
+        'files':          files,
+        'notes':          notes,
+        'whiteboards':    whiteboards,
+        'presentations':  presentations,
+        'root_folders':   root_folders,
+        'breadcrumb':     current.breadcrumb() if current else [],
+        'shared_folders': shared_folders,
     })
 
 
@@ -1033,3 +1050,242 @@ def public_whiteboard_view(request, token):
     wb.save(update_fields=['view_count'])
     wb.refresh_from_db(fields=['view_count'])
     return render(request, 'courses/public_whiteboard.html', {'wb': wb})
+
+
+# ─── COMPARTIR CARPETA CON USUARIO / EMPRESA ─────────────────────
+
+@login_required
+def folder_share_api(request, folder_id):
+    """Gestiona compartir directo de una carpeta con usuario o empresa."""
+    from courses.models import UserFolder, FolderShare
+    from accounts.models import Company
+    folder = get_object_or_404(UserFolder, pk=folder_id, user=request.user)
+
+    if request.method == 'POST':
+        action    = request.POST.get('action')
+        ttype     = request.POST.get('type')          # 'user' | 'company'
+        target_id = request.POST.get('target_id', '').strip()
+        share_id  = request.POST.get('share_id', '').strip()
+
+        if action == 'add':
+            if ttype == 'user' and target_id:
+                from django.contrib.auth.models import User as _User
+                target_user = get_object_or_404(_User, pk=target_id)
+                if target_user != request.user:
+                    FolderShare.objects.get_or_create(
+                        folder=folder, shared_by=request.user,
+                        with_user=target_user, with_company=None,
+                    )
+            elif ttype == 'company' and target_id:
+                company = get_object_or_404(Company, pk=target_id)
+                FolderShare.objects.get_or_create(
+                    folder=folder, shared_by=request.user,
+                    with_user=None, with_company=company,
+                )
+
+        elif action == 'remove' and share_id:
+            FolderShare.objects.filter(pk=share_id, folder=folder, shared_by=request.user).delete()
+
+    # Devuelve lista actual de shares
+    shares = FolderShare.objects.filter(folder=folder, shared_by=request.user).select_related(
+        'with_user', 'with_company'
+    )
+    data = []
+    for s in shares:
+        if s.with_user_id:
+            data.append({'id': s.pk, 'type': 'user',
+                         'name': s.with_user.get_full_name() or s.with_user.username,
+                         'sub': s.with_user.username})
+        else:
+            data.append({'id': s.pk, 'type': 'company',
+                         'name': str(s.with_company), 'sub': 'empresa'})
+    return JsonResponse({'ok': True, 'shares': data})
+
+
+@login_required
+def folder_share_search(request):
+    """Búsqueda de usuarios y empresas para compartir carpetas."""
+    from accounts.models import Company
+    q = request.GET.get('q', '').strip()
+    results = []
+    if len(q) >= 2:
+        from django.contrib.auth.models import User as _User
+        from django.db.models import Q
+        users = _User.objects.filter(is_active=True).exclude(pk=request.user.pk).filter(
+            Q(first_name__icontains=q) | Q(last_name__icontains=q) |
+            Q(username__icontains=q) | Q(email__icontains=q)
+        )[:8]
+        for u in users:
+            results.append({'id': u.pk, 'type': 'user',
+                            'name': u.get_full_name() or u.username,
+                            'sub': u.username})
+        companies = Company.objects.filter(name__icontains=q)[:5]
+        for c in companies:
+            results.append({'id': c.pk, 'type': 'company', 'name': c.name, 'sub': 'empresa'})
+    return JsonResponse({'results': results})
+
+
+@login_required
+def shared_folder_view(request, folder_id):
+    """Vista de lectura de una carpeta compartida directamente con el usuario."""
+    from courses.models import UserFolder, UserFile, UserNote, UserWhiteboard, FolderShare
+    from accounts.models import Company
+    from django.db.models import Q
+    folder = get_object_or_404(UserFolder, pk=folder_id)
+
+    # Verificar acceso
+    try:
+        company = request.user.profile.company
+    except Exception:
+        company = None
+
+    has_access = FolderShare.objects.filter(
+        folder=folder
+    ).filter(
+        Q(with_user=request.user) | (Q(with_company=company) if company else Q(pk__in=[]))
+    ).exists()
+
+    if not has_access and folder.user != request.user:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden('No tienes acceso a esta carpeta.')
+
+    files       = folder.files.order_by('name')
+    notes       = folder.notes.order_by('title')
+    whiteboards = folder.whiteboards.order_by('title')
+
+    return render(request, 'courses/my_docs.html', {
+        'active_nav':    'my_docs',
+        'current':       folder,
+        'subfolders':    [],
+        'files':         files,
+        'notes':         notes,
+        'whiteboards':   whiteboards,
+        'root_folders':  [],
+        'breadcrumb':    [folder],
+        'shared_folders': [],
+        'readonly':      True,
+        'shared_owner':  folder.user,
+    })
+
+
+# ─── PRESENTACIONES ──────────────────────────────────────────────────────────────
+
+@login_required
+def my_docs_presentation_new(request, folder_id):
+    from courses.models import UserFolder, UserPresentation, PRESENTATION_DEMO
+    folder = get_object_or_404(UserFolder, pk=folder_id, user=request.user)
+    pres = UserPresentation.objects.create(
+        user=request.user, folder=folder,
+        content=PRESENTATION_DEMO,
+    )
+    return redirect('courses:my_docs_presentation_edit', presentation_id=pres.pk)
+
+
+@login_required
+def my_docs_presentation_edit(request, presentation_id):
+    from courses.models import UserPresentation, REVEAL_THEMES
+    pres = get_object_or_404(UserPresentation, pk=presentation_id, user=request.user)
+    if request.method == 'POST':
+        pres.title   = request.POST.get('title', pres.title).strip() or pres.title
+        pres.content = request.POST.get('content', pres.content)
+        pres.theme   = request.POST.get('theme', pres.theme)
+        pres.save()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'ok': True})
+        return redirect('courses:my_docs_presentation_edit', presentation_id=pres.pk)
+    return render(request, 'courses/presentation_edit.html', {
+        'active_nav': 'my_docs',
+        'pres':       pres,
+        'themes':     REVEAL_THEMES,
+    })
+
+
+@login_required
+@require_POST
+def my_docs_presentation_delete(request, presentation_id):
+    from courses.models import UserPresentation
+    pres = get_object_or_404(UserPresentation, pk=presentation_id, user=request.user)
+    folder_id = pres.folder_id
+    pres.delete()
+    if folder_id:
+        return redirect('courses:my_docs_folder', folder_id=folder_id)
+    return redirect('courses:my_docs')
+
+
+@login_required
+def my_docs_presentation_present(request, presentation_id):
+    from courses.models import UserPresentation
+    pres = get_object_or_404(UserPresentation, pk=presentation_id, user=request.user)
+    return render(request, 'courses/presentation_present.html', {'pres': pres})
+
+
+@login_required
+@require_POST
+def my_docs_presentation_share(request, presentation_id):
+    import uuid as _uuid
+    from courses.models import UserPresentation
+    pres = get_object_or_404(UserPresentation, pk=presentation_id, user=request.user)
+    if pres.share_token:
+        pres.share_token = None
+    else:
+        pres.share_token = _uuid.uuid4()
+    pres.save(update_fields=['share_token'])
+    return JsonResponse({
+        'ok': True,
+        'shared': pres.share_token is not None,
+        'token': str(pres.share_token) if pres.share_token else None,
+    })
+
+
+def public_presentation_view(request, token):
+    from courses.models import UserPresentation
+    from django.db.models import F
+    pres = get_object_or_404(UserPresentation, share_token=token)
+    pres.view_count = F('view_count') + 1
+    pres.save(update_fields=['view_count'])
+    pres.refresh_from_db(fields=['view_count'])
+    return render(request, 'courses/presentation_present.html', {'pres': pres, 'is_public': True})
+
+
+@login_required
+def my_docs_search(request):
+    """Búsqueda global en Mis documentos del usuario autenticado."""
+    from courses.models import UserFolder, UserFile, UserNote, UserWhiteboard, UserPresentation
+    from django.db.models import Q
+    q = request.GET.get('q', '').strip()
+    results = []
+    if len(q) >= 1:
+        folders = UserFolder.objects.filter(user=request.user, name__icontains=q).order_by('name')[:8]
+        for obj in folders:
+            results.append({
+                'type': 'folder', 'icon': '📁',
+                'name': obj.name,
+                'url': '/dashboard/mis-docs/carpeta/{}/'.format(obj.pk),
+                'sub': 'Carpeta',
+            })
+        files = UserFile.objects.filter(user=request.user, name__icontains=q).order_by('name')[:8]
+        for obj in files:
+            results.append({
+                'type': 'file', 'icon': '📄',
+                'name': obj.name,
+                'url': obj.file.url,
+                'sub': obj.folder.name if obj.folder else '—',
+                'new_tab': True,
+            })
+        notes = UserNote.objects.filter(user=request.user, title__icontains=q).order_by('title')[:6]
+        for obj in notes:
+            results.append({
+                'type': 'note', 'icon': '📝',
+                'name': obj.title,
+                'url': '/dashboard/mis-docs/nota/{}/editar/'.format(obj.pk),
+                'sub': obj.folder.name if obj.folder else '—',
+            })
+        pres_qs = UserPresentation.objects.filter(user=request.user, title__icontains=q).order_by('title')[:6]
+        for obj in pres_qs:
+            results.append({
+                'type': 'presentation', 'icon': '🎞️',
+                'name': obj.title,
+                'url': '/dashboard/mis-docs/presentacion/{}/'.format(obj.pk),
+                'sub': obj.folder.name if obj.folder else '—',
+            })
+    return JsonResponse({'results': results, 'q': q})

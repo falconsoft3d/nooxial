@@ -51,11 +51,45 @@
       {% empty %}
       <p class="text-xs text-gray-400 px-3 py-2">Sin carpetas</p>
       {% endfor %}
+      {% if shared_folders %}
+      <div class="mt-3 pt-3 border-t border-gray-100">
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Compartida conmigo</p>
+        {% for s in shared_folders %}
+        <a href="{% url 'courses:shared_folder_view' s.folder.pk %}"
+           class="flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-colors text-blue-500 hover:bg-blue-50">
+          <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+          </svg>
+          <span class="truncate">{{ s.folder.name }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
     </div>
   </aside>
 
   <!-- Contenido principal -->
   <div class="flex-1 min-w-0 space-y-5">
+
+    <!-- Buscador -->
+    <div class="relative">
+      <div class="flex items-center gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-2.5 focus-within:ring-2 focus-within:ring-brand-300 focus-within:border-brand-300 transition-all">
+        <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+        </svg>
+        <input id="docs-search-input" type="text" placeholder="Buscar carpetas, archivos, notas, presentaciones…"
+               class="flex-1 text-sm bg-transparent border-none outline-none text-gray-800 placeholder-gray-400"
+               oninput="docsSearch(this.value)" autocomplete="off">
+        <button id="docs-search-clear" onclick="clearDocsSearch()"
+                class="hidden text-gray-400 hover:text-gray-700 text-lg leading-none">&times;</button>
+      </div>
+      <!-- Resultados -->
+      <div id="docs-search-results"
+           class="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-xl z-30 hidden overflow-hidden">
+        <div id="docs-search-list" class="max-h-80 overflow-y-auto py-1"></div>
+      </div>
+    </div>
 
     <!-- Toolbar -->
     <div class="flex flex-wrap items-center gap-2">
@@ -101,6 +135,15 @@
         </svg>
         Nueva pizarra
       </a>
+      <!-- Nueva presentación -->
+      <a href="{% url 'courses:my_docs_presentation_new' current.pk %}"
+         class="flex items-center gap-2 border border-purple-200 text-purple-700 font-semibold text-sm px-4 py-2 rounded-xl hover:bg-purple-50 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+        </svg>
+        Nueva presentación
+      </a>
       {% else %}
       <!-- Nueva carpeta raíz -->
       <button onclick="toggleModal('modal-folder')"
@@ -133,7 +176,8 @@
               {{ folder.notes.count }} nota{{ folder.notes.count|pluralize:"s" }}
             </p>
           </a>
-          <div class="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div class="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity flex-wrap">
+            {% if not readonly %}
             <button onclick="openRenameModal({{ folder.pk }}, '{{ folder.name|escapejs }}')"
                     class="text-xs text-gray-400 hover:text-gray-700 transition-colors">Renombrar</button>
             <button onclick="shareDoc('folder',{{ folder.pk }},this)"
@@ -142,13 +186,48 @@
                     data-token="{{ folder.share_token|default:'' }}">
               {% if folder.is_shared %}Compartida ({{ folder.view_count }}){% else %}Compartir{% endif %}
             </button>
+            <button onclick="openDirectShareModal({{ folder.pk }}, '{{ folder.name|escapejs }}')"
+                    class="text-xs text-blue-400 hover:text-blue-600 transition-colors">
+              👥 Compartir con…
+            </button>
             <form method="POST" action="{% url 'courses:my_docs_delete_folder' folder.pk %}"
                   onsubmit="return confirm('\u00bfEliminar la carpeta \u00ab{{ folder.name|escapejs }}\u00bb y todo su contenido?')">
               {% csrf_token %}
               <button type="submit" class="text-xs text-red-400 hover:text-red-600 transition-colors">Eliminar</button>
             </form>
+            {% endif %}
           </div>
         </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Compartida conmigo (solo en raíz) -->
+    {% if shared_folders %}
+    <div>
+      <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+        </svg>
+        Compartida conmigo
+      </p>
+      <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+        {% for s in shared_folders %}
+        <a href="{% url 'courses:shared_folder_view' s.folder.pk %}"
+           class="bg-blue-50 border border-blue-100 rounded-2xl p-4 hover:shadow-sm transition-shadow block">
+          <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center mb-3">
+            <svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M20 6h-8l-2-2H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2z"/>
+            </svg>
+          </div>
+          <p class="text-sm font-semibold text-gray-900 truncate">{{ s.folder.name }}</p>
+          <p class="text-xs text-blue-500 mt-0.5 truncate">
+            por {{ s.shared_by.get_full_name|default:s.shared_by.username }}
+            {% if s.with_company %} · {{ s.with_company.name }}{% endif %}
+          </p>
+        </a>
         {% endfor %}
       </div>
     </div>
@@ -206,6 +285,57 @@
             {% if wb.is_shared %} · <span class="text-brand-600">Compartida ({{ wb.view_count }})</span>{% endif %}
           </p>
         </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Presentaciones -->
+    {% if presentations %}
+    <div>
+      <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+        </svg>
+        Presentaciones
+      </p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+        {% for p in presentations %}
+        <div class="group bg-white border border-purple-100 rounded-2xl p-5 hover:shadow-sm hover:border-purple-300 transition-all flex flex-col gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+              </svg>
+            </div>
+            <p class="font-bold text-gray-900 truncate flex-1">{{ p.title }}</p>
+          </div>
+          <p class="text-xs text-gray-400">Editada {{ p.updated_at|date:"d M Y, H:i" }}</p>
+          <div class="flex gap-2">
+            <a href="{% url 'courses:my_docs_presentation_edit' p.pk %}"
+               class="flex-1 text-center text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-xl py-1.5 transition-colors">
+              ✏️ Editar
+            </a>
+            <a href="{% url 'courses:my_docs_presentation_present' p.pk %}" target="_blank"
+               class="flex-1 text-center text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-xl py-1.5 transition-colors">
+              ▶ Presentar
+            </a>
+            <button onclick="sharePresentation({{ p.pk }}, this)"
+                    data-shared="{{ p.is_shared|yesno:'true,false' }}"
+                    data-token="{{ p.share_token|default:'' }}"
+                    class="text-xs font-semibold {% if p.is_shared %}text-green-600 border-green-200 bg-green-50{% else %}text-gray-400 border-gray-200{% endif %} border rounded-xl px-2 py-1.5 hover:border-gray-400 transition-colors"
+                    title="{% if p.is_shared %}Copiado al enlace público{% else %}Compartir públicamente{% endif %}">
+              {% if p.is_shared %}🔗{% else %}🔗{% endif %}
+            </button>
+            <form method="POST" action="{% url 'courses:my_docs_presentation_delete' p.pk %}"
+                  onsubmit="return confirm('¿Eliminar «{{ p.title|escapejs }}»?')">
+              {% csrf_token %}
+              <button type="submit" class="text-xs text-gray-300 hover:text-red-500 transition-colors px-2 py-1.5">✕</button>
+            </form>
+          </div>
+        </div>
         {% endfor %}
       </div>
     </div>
@@ -336,6 +466,77 @@ function openRenameModal(folderId, currentName) {
   });
 });
 
+// ── Buscador de Mis documentos ────────────────────────────────
+var _docsSearchTimer = null;
+
+function docsSearch(q) {
+  clearTimeout(_docsSearchTimer);
+  var clearBtn = document.getElementById('docs-search-clear');
+  var resultsBox = document.getElementById('docs-search-results');
+  clearBtn.classList.toggle('hidden', !q.trim());
+  if (!q.trim()) { resultsBox.classList.add('hidden'); return; }
+  _docsSearchTimer = setTimeout(function() {
+    fetch('{% url "courses:my_docs_search" %}?q=' + encodeURIComponent(q))
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        var list = document.getElementById('docs-search-list');
+        if (!data.results.length) {
+          list.innerHTML = '<p class="text-sm text-gray-400 px-5 py-4">Sin resultados para «' + data.q + '»</p>';
+        } else {
+          list.innerHTML = data.results.map(function(r) {
+            return '<a href="' + r.url + '"' + (r.new_tab ? ' target="_blank"' : '') + ' '
+              + 'class="flex items-center gap-3 px-5 py-2.5 hover:bg-gray-50 transition-colors">'
+              + '<span class="text-lg flex-shrink-0 leading-none">' + r.icon + '</span>'
+              + '<div class="min-w-0 flex-1">'
+              + '<p class="text-sm font-medium text-gray-900 truncate">' + r.name + '</p>'
+              + '<p class="text-xs text-gray-400">' + r.sub + '</p>'
+              + '</div></a>';
+          }).join('');
+        }
+        resultsBox.classList.remove('hidden');
+      });
+  }, 200);
+}
+
+function clearDocsSearch() {
+  document.getElementById('docs-search-input').value = '';
+  document.getElementById('docs-search-clear').classList.add('hidden');
+  document.getElementById('docs-search-results').classList.add('hidden');
+  document.getElementById('docs-search-input').focus();
+}
+
+document.addEventListener('click', function(e) {
+  var inp = document.getElementById('docs-search-input');
+  var box = document.getElementById('docs-search-results');
+  if (inp && box && !inp.contains(e.target) && !box.contains(e.target)) {
+    box.classList.add('hidden');
+  }
+});
+
+// ── Compartir presentación públicamente ───────────────────────
+function sharePresentation(presId, btn) {
+  var fd = new URLSearchParams({ csrfmiddlewaretoken: CSRF });
+  fetch('/dashboard/mis-docs/presentacion/' + presId + '/compartir/', { method: 'POST', body: fd })
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (!d.ok) return;
+      if (d.shared && d.token) {
+        var url = location.origin + '/dashboard/presentacion/' + d.token + '/';
+        btn.dataset.shared = 'true';
+        btn.dataset.token  = d.token;
+        btn.classList.remove('text-gray-400', 'border-gray-200');
+        btn.classList.add('text-green-600', 'border-green-200', 'bg-green-50');
+        navigator.clipboard.writeText(url).catch(function(){});
+        showShareToast(url);
+      } else {
+        btn.dataset.shared = 'false';
+        btn.dataset.token  = '';
+        btn.classList.add('text-gray-400', 'border-gray-200');
+        btn.classList.remove('text-green-600', 'border-green-200', 'bg-green-50');
+      }
+    });
+}
+
 // ── Compartir archivo / carpeta ──────────────────────────────────
 var CSRF = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
@@ -387,5 +588,126 @@ function showShareToast(url) {
   clearTimeout(t._tid);
   t._tid = setTimeout(function(){ t.style.display = 'none'; }, 5000);
 }
+// ── Compartir carpeta con usuario/empresa ──────────────────
+var _dsModal = { folderId: null };
+
+function openDirectShareModal(folderId, folderName) {
+  _dsModal.folderId = folderId;
+  document.getElementById('ds-folder-name').textContent = folderName;
+  document.getElementById('ds-search').value = '';
+  document.getElementById('ds-results').innerHTML = '';
+  loadCurrentShares();
+  var m = document.getElementById('direct-share-modal');
+  m.classList.remove('hidden'); m.classList.add('flex');
+}
+
+function closeDirectShareModal() {
+  var m = document.getElementById('direct-share-modal');
+  m.classList.add('hidden'); m.classList.remove('flex');
+}
+
+function loadCurrentShares() {
+  fetch('{% url "courses:folder_share_api" 0 %}'.replace('/0/', '/' + _dsModal.folderId + '/'), {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'action=list',
+  }).then(r => r.json()).then(renderCurrentShares);
+}
+
+function renderCurrentShares(data) {
+  var el = document.getElementById('ds-current');
+  if (!data.shares || !data.shares.length) {
+    el.innerHTML = '<p class="text-xs text-gray-400">Sin destinatarios aún.</p>';
+    return;
+  }
+  el.innerHTML = data.shares.map(function(s) {
+    var icon = s.type === 'company'
+      ? '<svg class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>'
+      : '<svg class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>';
+    return '<div class="flex items-center gap-2 py-1.5">'
+      + icon
+      + '<div class="flex-1 min-w-0"><p class="text-sm font-medium text-gray-800 truncate">' + s.name + '</p>'
+      + '<p class="text-xs text-gray-400">' + s.sub + '</p></div>'
+      + '<button onclick="removeShare(' + s.id + ')" class="text-red-400 hover:text-red-600 text-xs flex-shrink-0">Quitar</button>'
+      + '</div>';
+  }).join('');
+}
+
+function removeShare(shareId) {
+  fetch('{% url "courses:folder_share_api" 0 %}'.replace('/0/', '/' + _dsModal.folderId + '/'), {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'action=remove&share_id=' + shareId,
+  }).then(r => r.json()).then(renderCurrentShares);
+}
+
+function addShare(type, targetId) {
+  fetch('{% url "courses:folder_share_api" 0 %}'.replace('/0/', '/' + _dsModal.folderId + '/'), {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'action=add&type=' + type + '&target_id=' + targetId,
+  }).then(r => r.json()).then(function(data) {
+    renderCurrentShares(data);
+    document.getElementById('ds-search').value = '';
+    document.getElementById('ds-results').innerHTML = '';
+  });
+}
+
+var _dsDebounce = null;
+document.addEventListener('DOMContentLoaded', function() {
+  var inp = document.getElementById('ds-search');
+  if (!inp) return;
+  inp.addEventListener('input', function() {
+    clearTimeout(_dsDebounce);
+    var q = inp.value.trim();
+    if (q.length < 2) { document.getElementById('ds-results').innerHTML = ''; return; }
+    _dsDebounce = setTimeout(function() {
+      fetch('{% url "courses:folder_share_search" %}?q=' + encodeURIComponent(q))
+        .then(r => r.json()).then(function(data) {
+          var el = document.getElementById('ds-results');
+          if (!data.results.length) {
+            el.innerHTML = '<p class="text-xs text-gray-400 px-2 py-1">Sin resultados</p>';
+            return;
+          }
+          el.innerHTML = data.results.map(function(r) {
+            return '<button onclick="addShare(\'' + r.type + '\',' + r.id + ')" '
+              + 'class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors">'
+              + '<div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-600 flex-shrink-0">'
+              + r.name[0].toUpperCase() + '</div>'
+              + '<div class="min-w-0"><p class="text-sm font-medium text-gray-800 truncate">' + r.name + '</p>'
+              + '<p class="text-xs text-gray-400">' + (r.type === 'company' ? '🏢 Empresa' : '@' + r.sub) + '</p></div>'
+              + '</button>';
+          }).join('');
+        });
+    }, 300);
+  });
+});
 </script>
+
+<!-- Modal: Compartir carpeta con usuario/empresa -->
+<div id="direct-share-modal"
+     class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-sm"
+     onclick="if(event.target===this)closeDirectShareModal()">
+  <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-4 p-6" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h3 class="text-base font-bold text-gray-900">Compartir carpeta</h3>
+        <p id="ds-folder-name" class="text-xs text-gray-500 mt-0.5"></p>
+      </div>
+      <button onclick="closeDirectShareModal()" class="text-gray-400 hover:text-gray-700 text-xl leading-none">&times;</button>
+    </div>
+
+    <!-- Buscador -->
+    <input id="ds-search" type="text" placeholder="Buscar usuario o empresa…"
+           class="w-full border border-gray-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 mb-2">
+    <div id="ds-results" class="mb-4 max-h-40 overflow-y-auto"></div>
+
+    <!-- Destinatarios actuales -->
+    <div class="border-t border-gray-100 pt-3">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Compartida con</p>
+      <div id="ds-current" class="max-h-36 overflow-y-auto space-y-0.5"></div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}

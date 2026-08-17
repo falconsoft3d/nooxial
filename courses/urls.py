@@ -29,6 +29,18 @@ urlpatterns = [
     path('mis-docs/pizarra/<int:whiteboard_id>/guardar/', views.my_docs_whiteboard_save, name='my_docs_whiteboard_save'),
     path('mis-docs/pizarra/<int:whiteboard_id>/eliminar/', views.my_docs_whiteboard_delete, name='my_docs_whiteboard_delete'),
     path('mis-docs/pizarra/<int:whiteboard_id>/compartir/', views.my_docs_whiteboard_share, name='my_docs_whiteboard_share'),
+    # Compartir carpeta directamente con usuario/empresa
+    path('mis-docs/carpeta/<int:folder_id>/compartir-con/', views.folder_share_api,    name='folder_share_api'),
+    path('mis-docs/api/buscar-destinatarios/',              views.folder_share_search, name='folder_share_search'),
+    path('mis-docs/compartida/<int:folder_id>/',            views.shared_folder_view,  name='shared_folder_view'),
+    # Presentaciones
+    path('mis-docs/carpeta/<int:folder_id>/presentacion/nueva/',     views.my_docs_presentation_new,     name='my_docs_presentation_new'),
+    path('mis-docs/presentacion/<int:presentation_id>/',             views.my_docs_presentation_edit,    name='my_docs_presentation_edit'),
+    path('mis-docs/presentacion/<int:presentation_id>/eliminar/',    views.my_docs_presentation_delete,  name='my_docs_presentation_delete'),
+    path('mis-docs/presentacion/<int:presentation_id>/presentar/',   views.my_docs_presentation_present, name='my_docs_presentation_present'),
+    path('mis-docs/presentacion/<int:presentation_id>/compartir/',   views.my_docs_presentation_share,   name='my_docs_presentation_share'),
+    path('presentacion/<uuid:token>/',                               views.public_presentation_view,     name='public_presentation'),
+    path('mis-docs/api/buscar/',                                     views.my_docs_search,               name='my_docs_search'),
     path('nota/<uuid:token>/', views.public_note_view, name='public_note'),
     path('archivo/<uuid:token>/', views.public_file_view, name='public_file'),
     path('carpeta/<uuid:token>/', views.public_folder_view, name='public_folder'),

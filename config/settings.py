@@ -75,6 +75,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'courses.context_processors.nav_my_courses',
                 'courses.context_processors.site_config',
+                'courses.context_processors.current_app_version',
             ],
         },
     },

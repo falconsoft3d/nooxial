@@ -2712,3 +2712,104 @@ def admin_platform_ratings(request):
         'n_neutral':  n_neutral,
         'n_sad':      n_sad,
     })
+
+
+# ─── VERSIONES ────────────────────────────────────────────────────────────────────
+
+@staff_required
+def admin_versions(request):
+    from accounts.models import AppVersion
+    versions = AppVersion.objects.prefetch_related('features').all()
+    return render(request, 'accounts/admin_versions.html', {
+        'active_nav': 'admin_versions',
+        'versions':   versions,
+    })
+
+
+@staff_required
+def admin_version_create(request):
+    from accounts.models import AppVersion
+    if request.method == 'POST':
+        version    = request.POST.get('version', '').strip()
+        title      = request.POST.get('title', '').strip()
+        released_at = request.POST.get('released_at', '').strip()
+        is_current  = request.POST.get('is_current') == '1'
+        if version and title and released_at:
+            v = AppVersion.objects.create(
+                version=version, title=title,
+                released_at=released_at, is_current=is_current,
+            )
+            return redirect('accounts:admin_version_edit', version_id=v.pk)
+    return redirect('accounts:admin_versions')
+
+
+@staff_required
+def admin_version_edit(request, version_id):
+    from accounts.models import AppVersion, AppVersionFeature, FEATURE_CATEGORY
+    v = get_object_or_404(AppVersion, pk=version_id)
+    if request.method == 'POST':
+        action = request.POST.get('action', 'save')
+        if action == 'save':
+            v.version     = request.POST.get('version', v.version).strip()
+            v.title       = request.POST.get('title', v.title).strip()
+            v.released_at = request.POST.get('released_at', str(v.released_at)).strip()
+            v.is_current  = request.POST.get('is_current') == '1'
+            v.save()
+        elif action == 'add_feature':
+            text     = request.POST.get('text', '').strip()
+            category = request.POST.get('category', 'feature')
+            if text:
+                last = v.features.order_by('order').last()
+                AppVersionFeature.objects.create(
+                    version=v, category=category, text=text,
+                    order=(last.order + 1) if last else 0,
+                )
+        elif action == 'delete_feature':
+            fid = request.POST.get('feature_id')
+            AppVersionFeature.objects.filter(pk=fid, version=v).delete()
+        return redirect('accounts:admin_version_edit', version_id=v.pk)
+    return render(request, 'accounts/admin_version_edit.html', {
+        'active_nav':       'admin_versions',
+        'v':                v,
+        'feature_categories': FEATURE_CATEGORY,
+    })
+
+
+@staff_required
+def admin_version_delete(request, version_id):
+    from accounts.models import AppVersion
+    v = get_object_or_404(AppVersion, pk=version_id)
+    if request.method == 'POST':
+        v.delete()
+    return redirect('accounts:admin_versions')
+
+
+def api_version_changelog(request, version_id):
+    """JSON con los detalles de una versión para el modal wizard."""
+    from accounts.models import AppVersion
+    v = get_object_or_404(AppVersion, pk=version_id)
+    features = list(v.features.values('category', 'text', 'order'))
+    return JsonResponse({
+        'id':          v.pk,
+        'version':     v.version,
+        'title':       v.title,
+        'released_at': v.released_at.strftime('%d/%m/%Y'),
+        'is_current':  v.is_current,
+        'features':    features,
+    })
+
+
+def api_all_versions(request):
+    """JSON con todas las versiones (para el modal wizard del usuario)."""
+    from accounts.models import AppVersion
+    versions = []
+    for v in AppVersion.objects.prefetch_related('features').all():
+        versions.append({
+            'id':          v.pk,
+            'version':     v.version,
+            'title':       v.title,
+            'released_at': v.released_at.strftime('%d/%m/%Y'),
+            'is_current':  v.is_current,
+            'features':    list(v.features.values('category', 'text')),
+        })
+    return JsonResponse({'versions': versions})

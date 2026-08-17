@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ pres.title }}</title>
+
+  <!-- Reveal.js -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/{{ pres.theme }}.css" id="theme">
+  <!-- Highlight.js (code blocks) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css">
+
+  <style>
+    /* Barra de utilidades flotante */
+    #util-bar {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 9999;
+      display: flex;
+      gap: 8px;
+      opacity: 0.2;
+      transition: opacity .25s;
+    }
+    #util-bar:hover { opacity: 1; }
+    .util-btn {
+      background: rgba(0,0,0,.6);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      backdrop-filter: blur(6px);
+      white-space: nowrap;
+    }
+    .util-btn:hover { background: rgba(0,0,0,.85); }
+  </style>
+</head>
+<body>
+
+  <!-- ── Barra flotante (aparece al hacer hover en esquina superior derecha) ── -->
+  <div id="util-bar">
+    <button class="util-btn" onclick="toggleFullscreen()" title="Pantalla completa">⛶ Fullscreen</button>
+    {% if not is_public %}
+    <a class="util-btn" href="{% url 'courses:my_docs_presentation_edit' pres.pk %}">✏ Editar</a>
+    {% if pres.folder %}
+    <a class="util-btn" href="{% url 'courses:my_docs_folder' pres.folder.pk %}">← Mis docs</a>
+    {% endif %}
+    {% else %}
+    <span class="util-btn" style="cursor:default;opacity:.7">👁 Vista pública · {{ pres.view_count }} vistas</span>
+    {% endif %}
+  </div>
+
+  <!-- ── Reveal.js wrapper ── -->
+  <div class="reveal">
+    <div class="slides">
+      <!--
+        data-separator : separa slides horizontales  → ---
+        data-separator-vertical : separa slides verticales → --
+      -->
+      <section
+        data-markdown
+        data-separator="^\n---\n"
+        data-separator-vertical="^\n--\n"
+        data-separator-notes="^Note:"
+      >
+        <textarea data-template>{{ pres.content }}</textarea>
+      </section>
+    </div>
+  </div>
+
+  <!-- Reveal.js scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/markdown/markdown.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/zoom/zoom.js"></script>
+
+  <script>
+    Reveal.initialize({
+      hash: true,
+      slideNumber: 'c/t',
+      progress: true,
+      controls: true,
+      center: true,
+      transition: 'slide',
+      transitionSpeed: 'default',
+      backgroundTransition: 'fade',
+      plugins: [ RevealMarkdown, RevealHighlight, RevealNotes, RevealZoom ],
+    });
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(function(){});
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    // F key → fullscreen
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'f' || e.key === 'F') {
+        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+          toggleFullscreen();
+        }
+      }
+    });
+  </script>
+</body>
+</html>

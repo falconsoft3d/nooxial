@@ -122,4 +122,11 @@ urlpatterns = [
     # Evaluaciones de plataforma
     path('api/evaluar/',        views.platform_rating_submit,  name='platform_rating_submit'),
     path('panel/evaluaciones/', views.admin_platform_ratings,  name='admin_platform_ratings'),
+    # Versiones
+    path('panel/versiones/',                              views.admin_versions,        name='admin_versions'),
+    path('panel/versiones/nueva/',                        views.admin_version_create,  name='admin_version_create'),
+    path('panel/versiones/<int:version_id>/',             views.admin_version_edit,    name='admin_version_edit'),
+    path('panel/versiones/<int:version_id>/eliminar/',    views.admin_version_delete,  name='admin_version_delete'),
+    path('api/versiones/',                                views.api_all_versions,      name='api_all_versions'),
+    path('api/versiones/<int:version_id>/',               views.api_version_changelog, name='api_version_changelog'),
 ]

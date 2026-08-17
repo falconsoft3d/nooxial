@@ -524,3 +524,49 @@ class PlatformRating(models.Model):
 
     def __str__(self):
         return f'{self.user.username} – {self.get_rating_display()} – {self.created_at.strftime("%d/%m/%Y")}'
+
+
+# ─── VERSIONES DE LA PLATAFORMA ──────────────────────────────────────────────────
+
+class AppVersion(models.Model):
+    version     = models.CharField(max_length=20, unique=True, verbose_name='Versión')
+    title       = models.CharField(max_length=255, verbose_name='Título')
+    released_at = models.DateField(verbose_name='Fecha de lanzamiento')
+    is_current  = models.BooleanField(default=False, verbose_name='Versión actual')
+
+    class Meta:
+        verbose_name        = 'Versión'
+        verbose_name_plural = 'Versiones'
+        ordering            = ['-released_at']
+
+    def __str__(self):
+        return f'v{self.version} — {self.title}'
+
+    def save(self, *args, **kwargs):
+        if self.is_current:
+            AppVersion.objects.exclude(pk=self.pk).update(is_current=False)
+        super().save(*args, **kwargs)
+
+
+FEATURE_CATEGORY = [
+    ('feature',     '✨ Novedad'),
+    ('improvement', '🔧 Mejora'),
+    ('fix',         '🐛 Corrección'),
+]
+
+
+class AppVersionFeature(models.Model):
+    version  = models.ForeignKey(AppVersion, on_delete=models.CASCADE,
+                                 related_name='features', verbose_name='Versión')
+    category = models.CharField(max_length=20, choices=FEATURE_CATEGORY,
+                                default='feature', verbose_name='Categoría')
+    text     = models.CharField(max_length=500, verbose_name='Descripción')
+    order    = models.PositiveSmallIntegerField(default=0, verbose_name='Orden')
+
+    class Meta:
+        verbose_name        = 'Mejora'
+        verbose_name_plural = 'Mejoras'
+        ordering            = ['order', 'pk']
+
+    def __str__(self):
+        return f'{self.get_category_display()} — {self.text[:60]}'
