@@ -15,7 +15,10 @@ def home(request):
 
     featured_courses = Course.objects.filter(
         is_featured=True, is_published=True
-    ).prefetch_related('categories').annotate(avg_rating=Avg('reviews__rating')).order_by('-created_at')[:6]
+    ).prefetch_related('categories').annotate(
+        avg_rating=Avg('reviews__rating'),
+        enrollment_count=Count('enrollments'),
+    ).order_by('-created_at')[:6]
 
     stats = {
         'courses_count':     Course.objects.filter(is_published=True).count(),
@@ -24,10 +27,17 @@ def home(request):
         'enrollments_count': Enrollment.objects.count(),
     }
 
+    from accounts.models import PlatformRating
+    happy_ratings = (PlatformRating.objects
+                     .filter(rating='happy')
+                     .select_related('user')
+                     .order_by('-created_at')[:60])
+
     return render(request, 'core/home.html', {
         'categories':       categories,
         'featured_courses': featured_courses,
         'stats':            stats,
+        'happy_ratings':    happy_ratings,
     })
 
 

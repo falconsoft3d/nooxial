@@ -907,14 +907,34 @@ def admin_course_form(request, course_id=None):
                 messages.success(request, f'Curso "{course.title}" creado correctamente.')
                 return redirect('accounts:admin_course_edit', course_id=course.pk)
 
+    if editing:
+        from courses.models import Enrollment, ExamAttempt
+        kpi_enrolled  = Enrollment.objects.filter(course=target).count()
+        kpi_started   = Enrollment.objects.filter(course=target, progress__gt=0).count()
+        kpi_evaluated = ExamAttempt.objects.filter(exam__course=target).values('student').distinct().count()
+        kpi_completed = Enrollment.objects.filter(course=target, progress=100).count()
+        kpi_started_pct   = round(kpi_started   / kpi_enrolled * 100) if kpi_enrolled else 0
+        kpi_evaluated_pct = round(kpi_evaluated / kpi_enrolled * 100) if kpi_enrolled else 0
+        kpi_completed_pct = round(kpi_completed / kpi_enrolled * 100) if kpi_enrolled else 0
+    else:
+        kpi_enrolled = kpi_started = kpi_evaluated = kpi_completed = 0
+        kpi_started_pct = kpi_evaluated_pct = kpi_completed_pct = 0
+
     return render(request, 'accounts/admin_course_form.html', {
-        'active_nav':    'admin_courses',
-        'editing':       editing,
-        'target':        target,
-        'plans':         plans,
-        'categories':    categories,
-        'users':         users,
-        'selected_cats': set(target.categories.values_list('pk', flat=True)) if editing else set(),
+        'active_nav':          'admin_courses',
+        'editing':             editing,
+        'target':              target,
+        'plans':               plans,
+        'categories':          categories,
+        'users':               users,
+        'selected_cats':       set(target.categories.values_list('pk', flat=True)) if editing else set(),
+        'kpi_enrolled':        kpi_enrolled,
+        'kpi_started':         kpi_started,
+        'kpi_evaluated':       kpi_evaluated,
+        'kpi_completed':       kpi_completed,
+        'kpi_started_pct':     kpi_started_pct,
+        'kpi_evaluated_pct':   kpi_evaluated_pct,
+        'kpi_completed_pct':   kpi_completed_pct,
     })
 
 
@@ -2344,7 +2364,8 @@ def plan_register_view(request, token, company_id=None):
     company = get_object_or_404(Company, pk=company_id) if company_id else None
     config  = SiteConfig.get()
 
-    if not config.enable_registration:
+    # El registro por enlace de empresa/plan siempre está activo (company_id indica origen empresarial)
+    if not config.enable_registration and not company_id:
         return render(request, 'accounts/register_closed.html', {'plan': plan})
 
     error = None
@@ -2382,10 +2403,33 @@ def plan_register_view(request, token, company_id=None):
                 Enrollment.objects.get_or_create(student=user, course=course)
             return redirect('courses:dashboard')
 
+    kpi_registered = kpi_started = kpi_evaluated = 0
+    kpi_started_pct = kpi_evaluated_pct = 0
+    if company:
+        from courses.models import ExamAttempt as _EA
+        plan_courses = plan.courses.filter(is_published=True)
+        kpi_registered = (Enrollment.objects
+                          .filter(course__in=plan_courses, student__profile__company=company)
+                          .values('student').distinct().count())
+        kpi_started    = (Enrollment.objects
+                          .filter(course__in=plan_courses, student__profile__company=company, progress__gt=0)
+                          .values('student').distinct().count())
+        kpi_evaluated  = (_EA.objects
+                          .filter(exam__course__in=plan_courses, student__profile__company=company)
+                          .values('student').distinct().count())
+        if kpi_registered:
+            kpi_started_pct   = round(kpi_started   / kpi_registered * 100)
+            kpi_evaluated_pct = round(kpi_evaluated / kpi_registered * 100)
+
     return render(request, 'accounts/plan_register.html', {
-        'plan':    plan,
-        'company': company,
-        'error':   error,
+        'plan':              plan,
+        'company':           company,
+        'error':             error,
+        'kpi_registered':    kpi_registered,
+        'kpi_started':       kpi_started,
+        'kpi_evaluated':     kpi_evaluated,
+        'kpi_started_pct':   kpi_started_pct,
+        'kpi_evaluated_pct': kpi_evaluated_pct,
     })
 
 def public_cv(request, username):
@@ -2636,3 +2680,35 @@ def meeting_signal_poll(request):
          'data': s.data, 'target': s.target}
         for s in signals
     ]})
+
+
+# ─── EVALUACIONES DE PLATAFORMA ──────────────────────────────────
+
+@login_required
+@require_POST
+def platform_rating_submit(request):
+    from accounts.models import PlatformRating
+    rating  = request.POST.get('rating', '').strip()
+    comment = request.POST.get('comment', '').strip()
+    if rating not in ('happy', 'neutral', 'sad'):
+        return JsonResponse({'ok': False, 'error': 'Valoración inválida'}, status=400)
+    PlatformRating.objects.create(user=request.user, rating=rating, comment=comment)
+    return JsonResponse({'ok': True})
+
+
+@staff_required
+def admin_platform_ratings(request):
+    from accounts.models import PlatformRating
+    ratings  = PlatformRating.objects.select_related('user').order_by('-created_at')
+    total    = ratings.count()
+    n_happy  = ratings.filter(rating='happy').count()
+    n_neutral = ratings.filter(rating='neutral').count()
+    n_sad    = ratings.filter(rating='sad').count()
+    return render(request, 'accounts/admin_platform_ratings.html', {
+        'active_nav': 'admin_ratings',
+        'ratings':    ratings,
+        'total':      total,
+        'n_happy':    n_happy,
+        'n_neutral':  n_neutral,
+        'n_sad':      n_sad,
+    })

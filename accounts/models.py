@@ -501,3 +501,26 @@ class MeetingSignal(models.Model):
 
     def __str__(self):
         return f'[{self.company}] {self.peer_id} → {self.target or "all"}: {self.stype}'
+
+
+# ─── EVALUACIONES DE PLATAFORMA ──────────────────────────────────
+
+class PlatformRating(models.Model):
+    RATING_CHOICES = [
+        ('happy',   '😊 Feliz'),
+        ('neutral', '😐 Neutral'),
+        ('sad',     '😞 Triste'),
+    ]
+    user       = models.ForeignKey(User, on_delete=models.CASCADE,
+                                   related_name='platform_ratings', verbose_name='Usuario')
+    rating     = models.CharField(max_length=10, choices=RATING_CHOICES, verbose_name='Valoración')
+    comment    = models.TextField(blank=True, verbose_name='Comentario')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Fecha')
+
+    class Meta:
+        verbose_name        = 'Evaluación de plataforma'
+        verbose_name_plural = 'Evaluaciones de plataforma'
+        ordering            = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user.username} – {self.get_rating_display()} – {self.created_at.strftime("%d/%m/%Y")}'

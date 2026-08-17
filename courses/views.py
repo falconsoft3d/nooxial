@@ -216,7 +216,8 @@ def course_detail(request, slug):
         'passed_exam':     passed_exam,
         'reviews':         CourseReview.objects.filter(course=course).select_related('student', 'student__profile').order_by('-created_at'),
         'user_review':     CourseReview.objects.filter(course=course, student=request.user).first() if enrollment else None,
-        'avg_rating':      CourseReview.objects.filter(course=course).aggregate(avg=Avg('rating'))['avg'],
+        'avg_rating':          CourseReview.objects.filter(course=course).aggregate(avg=Avg('rating'))['avg'],
+        'enrollment_count':    Enrollment.objects.filter(course=course).count(),
     })
 
 

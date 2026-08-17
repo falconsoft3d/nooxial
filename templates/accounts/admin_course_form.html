@@ -19,10 +19,12 @@
 {% endblock %}
 
 {% block content %}
-<form method="POST" enctype="multipart/form-data">
+<div class="flex gap-6 items-start">
+
+<form method="POST" enctype="multipart/form-data" class="flex-1 min-w-0 max-w-2xl">
 {% csrf_token %}
 
-<div class="bg-white rounded-2xl border border-gray-100 max-w-2xl">
+<div class="bg-white rounded-2xl border border-gray-100">
 
   <!-- ── ACTION BAR ─────────────────────────────────────────── -->
   <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
@@ -334,6 +336,99 @@
   </div>
 </div>
 </form>
+
+{% if editing %}
+<!-- ── KPI SIDEBAR ── -->
+<div class="w-64 flex-shrink-0 space-y-3">
+
+  <p class="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">KPIs del curso</p>
+
+  <!-- Inscritos -->
+  <div class="bg-white rounded-2xl border border-gray-100 p-5">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
+        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+      </div>
+      <div class="flex-1">
+        <p class="text-xs text-gray-400 font-medium">Usuarios inscritos</p>
+        <p class="text-3xl font-black text-gray-900 leading-none mt-0.5">{{ kpi_enrolled }}</p>
+      </div>
+    </div>
+    <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+      <div class="h-full bg-blue-400 rounded-full" style="width:100%"></div>
+    </div>
+    <p class="text-xs text-gray-400 mt-1.5 text-right">Base de referencia</p>
+  </div>
+
+  <!-- Iniciados -->
+  <div class="bg-white rounded-2xl border border-gray-100 p-5">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center flex-shrink-0">
+        <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+      </div>
+      <div class="flex-1">
+        <p class="text-xs text-gray-400 font-medium">Usuarios iniciados</p>
+        <p class="text-3xl font-black text-gray-900 leading-none mt-0.5">{{ kpi_started }}</p>
+      </div>
+    </div>
+    <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+      <div class="h-full bg-amber-400 rounded-full" style="width:{{ kpi_started_pct }}%"></div>
+    </div>
+    <p class="text-xs text-gray-400 mt-1.5 text-right">{{ kpi_started_pct }}% de inscritos</p>
+  </div>
+
+  <!-- Evaluados -->
+  <div class="bg-white rounded-2xl border border-gray-100 p-5">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center flex-shrink-0">
+        <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+        </svg>
+      </div>
+      <div class="flex-1">
+        <p class="text-xs text-gray-400 font-medium">Usuarios evaluados</p>
+        <p class="text-3xl font-black text-gray-900 leading-none mt-0.5">{{ kpi_evaluated }}</p>
+      </div>
+    </div>
+    <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+      <div class="h-full bg-purple-400 rounded-full" style="width:{{ kpi_evaluated_pct }}%"></div>
+    </div>
+    <p class="text-xs text-gray-400 mt-1.5 text-right">{{ kpi_evaluated_pct }}% de inscritos</p>
+  </div>
+
+  <!-- Completados -->
+  <div class="bg-white rounded-2xl border border-gray-100 p-5">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center flex-shrink-0">
+        <svg class="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+      </div>
+      <div class="flex-1">
+        <p class="text-xs text-gray-400 font-medium">Completaron el curso</p>
+        <p class="text-3xl font-black text-gray-900 leading-none mt-0.5">{{ kpi_completed }}</p>
+      </div>
+    </div>
+    <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+      <div class="h-full bg-brand-400 rounded-full" style="width:{{ kpi_completed_pct }}%"></div>
+    </div>
+    <p class="text-xs text-gray-400 mt-1.5 text-right">{{ kpi_completed_pct }}% de inscritos</p>
+  </div>
+
+</div>
+{% endif %}
+
+</div><!-- /flex wrapper -->
 
 <style>
   input:checked ~ div > div { transform: translateX(1.25rem); }

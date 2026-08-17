@@ -3,17 +3,73 @@
 {% block navbar %}{% endblock %}
 {% block footer %}{% endblock %}
 
+{% block extra_head %}
+<style>
+/* ── Sidebar collapsible & mobile drawer ── */
+#sidebar {
+  width: 16rem;
+  overflow: hidden;
+  transition: width 0.3s ease, transform 0.3s ease;
+}
+#sidebar .sidebar-logo-n { display: none; }
+
+@media (min-width: 768px) {
+  #sidebar.sidebar-collapsed { width: 4rem; }
+  #sidebar.sidebar-collapsed nav { padding-left: 0 !important; padding-right: 0 !important; }
+  #sidebar.sidebar-collapsed nav a {
+    font-size: 0 !important;
+    justify-content: center !important;
+    padding: 0.75rem !important;
+    gap: 0 !important;
+  }
+  #sidebar.sidebar-collapsed nav a svg { width: 1.25rem !important; height: 1.25rem !important; flex-shrink: 0; }
+  #sidebar.sidebar-collapsed .sidebar-logo-text { display: none; }
+  #sidebar.sidebar-collapsed .sidebar-logo-n { display: flex !important; flex: 1; justify-content: center; }
+  #sidebar.sidebar-collapsed .sidebar-logo-area { justify-content: center; }
+  #sidebar.sidebar-collapsed .sidebar-text { display: none !important; }
+  #sidebar.sidebar-collapsed .sidebar-bottom-profile { justify-content: center !important; padding: 0.75rem !important; }
+  #sidebar.sidebar-collapsed .sidebar-bottom-link {
+    justify-content: center !important;
+    padding: 0.75rem !important;
+    font-size: 0 !important;
+    gap: 0 !important;
+  }
+  #sidebar.sidebar-collapsed .sidebar-bottom-link svg { width: 1rem !important; height: 1rem !important; flex-shrink: 0; }
+  #main-content { margin-left: 16rem; transition: margin-left 0.3s ease; }
+  #main-content.sidebar-collapsed { margin-left: 4rem; }
+}
+
+@media (max-width: 767px) {
+  #sidebar { transform: translateX(-100%); width: 16rem !important; z-index: 50; }
+  #sidebar.mobile-open { transform: translateX(0); }
+  #main-content { margin-left: 0 !important; }
+}
+</style>
+{% endblock %}
+
 {% block body %}
 <div class="min-h-screen bg-gray-50 flex">
 
+  <!-- Mobile overlay -->
+  <div id="sidebar-overlay" onclick="toggleSidebar()" class="hidden fixed inset-0 bg-black bg-opacity-30 z-30 md:hidden"></div>
+
   <!-- ─── SIDEBAR ───────────────────────────────────────────── -->
-  <aside class="hidden md:flex flex-col w-64 bg-white border-r border-gray-100 min-h-screen fixed left-0 top-0 bottom-0">
+  <aside id="sidebar" class="flex flex-col bg-white border-r border-gray-100 min-h-screen fixed left-0 top-0 bottom-0 z-40">
 
     <!-- Logo -->
-    <div class="px-6 py-5 border-b border-gray-100">
-      <a href="/" class="text-xl font-black tracking-tight text-gray-900">
+    <div class="sidebar-logo-area px-4 py-4 border-b border-gray-100 flex items-center gap-2" style="min-height:64px">
+      <a href="/" class="sidebar-logo-text flex-1 text-xl font-black tracking-tight text-gray-900">
         <span class="text-brand-400">N</span>ooxial
       </a>
+      <a href="/" class="sidebar-logo-n text-xl font-black tracking-tight text-gray-900">
+        <span class="text-brand-400">N</span>
+      </a>
+      <button onclick="toggleSidebar()" title="Minimizar menú"
+              class="sidebar-toggle-btn w-8 h-8 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors flex-shrink-0">
+        <svg id="sidebar-chevron" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
+        </svg>
+      </button>
     </div>
 
     <!-- Nav -->
@@ -109,7 +165,7 @@
       <!-- ─ ADMINISTRACIÓN (solo staff) ─ -->
       {% if user.is_staff %}
       <div class="pt-3 mt-3 border-t border-gray-100">
-        <p class="px-4 mb-1 text-xs font-semibold text-gray-400 uppercase tracking-widest">Administración</p>
+        <p class="px-4 mb-1 text-xs font-semibold text-gray-400 uppercase tracking-widest sidebar-text">Administración</p>
         <div class="overflow-y-auto" style="max-height: calc(4 * 3.25rem);">
 
         <a href="{% url 'accounts:admin_progress' %}"
@@ -252,6 +308,13 @@
           Artículos
         </a>
 
+        <a href="{% url 'accounts:admin_platform_ratings' %}"
+           class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm transition-colors
+                  {% if active_nav == 'admin_ratings' %}bg-brand-50 text-gray-900{% else %}text-gray-500 hover:bg-gray-50 hover:text-gray-900{% endif %}">
+          <span class="text-base {% if active_nav == 'admin_ratings' %}opacity-100{% else %}opacity-60{% endif %}">😊</span>
+          Evaluaciones
+        </a>
+
         <a href="{% url 'accounts:admin_support' %}"
            class="flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm transition-colors
                   {% if active_nav == 'admin_support' %}bg-brand-50 text-gray-900{% else %}text-gray-500 hover:bg-gray-50 hover:text-gray-900{% endif %}">
@@ -299,7 +362,7 @@
 
     <!-- User section at bottom -->
     <div class="px-3 py-4 border-t border-gray-100">
-      <a href="{% url 'accounts:profile' %}" class="flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-gray-50 transition-colors">
+      <a href="{% url 'accounts:profile' %}" class="sidebar-bottom-profile flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-gray-50 transition-colors">
         {% if user.profile.photo %}
         <img src="{{ user.profile.photo.url }}" alt="Foto"
              class="w-9 h-9 rounded-full object-cover flex-shrink-0">
@@ -308,13 +371,13 @@
           {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
         </div>
         {% endif %}
-        <div class="flex-1 min-w-0">
+        <div class="sidebar-text flex-1 min-w-0">
           <p class="text-sm font-semibold text-gray-900 truncate">{{ user.get_full_name }}</p>
           <p class="text-xs text-gray-400 truncate">@{{ user.username }}</p>
         </div>
       </a>
       <a href="{% url 'accounts:logout' %}"
-         class="mt-1 flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors">
+         class="sidebar-bottom-link mt-1 flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -325,12 +388,27 @@
   </aside>
 
   <!-- ─── MAIN CONTENT ──────────────────────────────────────── -->
-  <main class="flex-1 md:ml-64">
+  <main id="main-content" class="flex-1">
 
     <!-- Top bar -->
-    <header class="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between sticky top-0 z-10">
+    <header class="bg-white border-b border-gray-100 px-4 md:px-8 py-4 flex items-center justify-between sticky top-0 z-10">
+      <!-- Hamburger (solo móvil) -->
+      <button onclick="toggleSidebar()" class="md:hidden mr-3 w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors flex-shrink-0">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
       {% block topbar %}{% endblock %}
       <div class="flex items-center gap-3 ml-auto">
+
+        <!-- Evaluar plataforma -->
+        <button onclick="openRatingModal()" title="Evalúanos"
+                id="rating-open-btn"
+                class="flex items-center gap-1.5 px-3 h-9 rounded-full border text-sm font-semibold transition-colors
+                       {% if request.user.platform_ratings.all %}border-gray-200 text-gray-600 hover:bg-brand-50 hover:border-brand-300{% else %}rating-pulse border-brand-400 text-brand-600 hover:bg-brand-50{% endif %}">
+          <span class="text-base leading-none">😊</span>
+          <span class="hidden sm:inline">Evalúanos</span>
+        </button>
 
         <!-- Grabación de pantalla -->
         <div class="relative" id="rec-wrapper">
@@ -548,7 +626,80 @@
   </main>
 </div>
 
+<!-- ── Modal: Evaluar plataforma ─────────────────────────── -->
+<div id="rating-modal"
+     class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-sm"
+     onclick="if(event.target===this)closeRatingModal()">
+  <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-4 p-6" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="text-lg font-bold text-gray-900">¿Cómo valoras la plataforma?</h3>
+      <button onclick="closeRatingModal()" class="text-gray-400 hover:text-gray-700 text-xl leading-none">&times;</button>
+    </div>
+
+    <!-- Caritas -->
+    <div class="flex justify-center gap-6 mb-5" id="rating-faces">
+      <button onclick="selectRating('sad')"     data-face="sad"
+              class="rating-face flex flex-col items-center gap-1 p-3 rounded-2xl border-2 border-transparent hover:border-red-300 transition-colors">
+        <span class="text-4xl">😞</span>
+        <span class="text-xs text-gray-500">Mal</span>
+      </button>
+      <button onclick="selectRating('neutral')" data-face="neutral"
+              class="rating-face flex flex-col items-center gap-1 p-3 rounded-2xl border-2 border-transparent hover:border-amber-300 transition-colors">
+        <span class="text-4xl">😐</span>
+        <span class="text-xs text-gray-500">Regular</span>
+      </button>
+      <button onclick="selectRating('happy')"   data-face="happy"
+              class="rating-face flex flex-col items-center gap-1 p-3 rounded-2xl border-2 border-transparent hover:border-brand-300 transition-colors">
+        <span class="text-4xl">😊</span>
+        <span class="text-xs text-gray-500">Bien</span>
+      </button>
+    </div>
+
+    <input type="hidden" id="rating-value" value="">
+
+    <textarea id="rating-comment" rows="3" placeholder="Comentario opcional…"
+              class="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-300 mb-4"></textarea>
+
+    <button onclick="submitRating()"
+            class="w-full bg-brand-400 hover:bg-brand-300 text-gray-900 font-semibold py-3 rounded-2xl transition-colors text-sm">
+      Enviar valoración
+    </button>
+    <p id="rating-feedback" class="text-center text-xs text-gray-400 mt-3 hidden">¡Gracias por tu valoración! Puedes valorar cuantas veces quieras.</p>
+  </div>
+</div>
+
 <script>
+/* ── Sidebar toggle ── */
+function toggleSidebar() {
+  var sidebar  = document.getElementById('sidebar');
+  var main     = document.getElementById('main-content');
+  var overlay  = document.getElementById('sidebar-overlay');
+  var chevron  = document.getElementById('sidebar-chevron');
+  var isMobile = window.innerWidth < 768;
+  if (isMobile) {
+    var isOpen = sidebar.classList.toggle('mobile-open');
+    if (overlay) overlay.classList.toggle('hidden', !isOpen);
+  } else {
+    var isCollapsed = sidebar.classList.toggle('sidebar-collapsed');
+    if (main)    main.classList.toggle('sidebar-collapsed', isCollapsed);
+    if (chevron) chevron.style.transform = isCollapsed ? 'rotate(180deg)' : '';
+    try { localStorage.setItem('nooxial_sidebar', isCollapsed ? '1' : '0'); } catch(e) {}
+  }
+}
+// Restaurar estado al cargar
+(function() {
+  try {
+    if (window.innerWidth >= 768 && localStorage.getItem('nooxial_sidebar') === '1') {
+      var sb = document.getElementById('sidebar');
+      var mc = document.getElementById('main-content');
+      var ch = document.getElementById('sidebar-chevron');
+      if (sb) sb.classList.add('sidebar-collapsed');
+      if (mc) mc.classList.add('sidebar-collapsed');
+      if (ch) ch.style.transform = 'rotate(180deg)';
+    }
+  } catch(e) {}
+})();
+
 function toggleProfileMenu() {
   document.getElementById('profile-dropdown').classList.toggle('hidden');
 }
@@ -1020,5 +1171,85 @@ document.addEventListener('click', function(e) {
   active:scale: 0.95;
 }
 .calc-btn:active { transform: scale(0.93); }
+
+/* Botón Evalúanos — pulso animado cuando el usuario nunca ha evaluado */
+@keyframes rating-border-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(159,232,112,.7); }
+  50%       { box-shadow: 0 0 0 5px rgba(159,232,112,0); }
+}
+.rating-pulse {
+  animation: rating-border-pulse 1.8s ease-in-out infinite;
+}
 </style>
+
+<script>
+/* ── Evaluación de plataforma ── */
+var _selectedRating = '';
+
+function openRatingModal() {
+  _selectedRating = '';
+  document.getElementById('rating-value').value = '';
+  document.getElementById('rating-comment').value = '';
+  document.getElementById('rating-feedback').classList.add('hidden');
+  document.querySelectorAll('.rating-face').forEach(function(btn) {
+    btn.classList.remove('border-brand-400','border-red-400','border-amber-400',
+                         'bg-brand-50','bg-red-50','bg-amber-50');
+  });
+  var m = document.getElementById('rating-modal');
+  m.classList.remove('hidden');
+  m.classList.add('flex');
+}
+
+function closeRatingModal() {
+  var m = document.getElementById('rating-modal');
+  m.classList.add('hidden');
+  m.classList.remove('flex');
+}
+
+function selectRating(val) {
+  _selectedRating = val;
+  document.getElementById('rating-value').value = val;
+  var colorMap = { happy: 'border-brand-400 bg-brand-50', neutral: 'border-amber-400 bg-amber-50', sad: 'border-red-400 bg-red-50' };
+  document.querySelectorAll('.rating-face').forEach(function(btn) {
+    btn.classList.remove('border-brand-400','border-red-400','border-amber-400',
+                         'bg-brand-50','bg-red-50','bg-amber-50');
+    if (btn.dataset.face === val) {
+      colorMap[val].split(' ').forEach(function(c){ btn.classList.add(c); });
+    }
+  });
+}
+
+function submitRating() {
+  if (!_selectedRating) { alert('Selecciona una valoración.'); return; }
+  var comment = document.getElementById('rating-comment').value.trim();
+  var csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+  var token = csrf ? csrf.value : '';
+  var body  = new URLSearchParams({ rating: _selectedRating, comment: comment, csrfmiddlewaretoken: token });
+  fetch('{% url "accounts:platform_rating_submit" %}', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': token, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.ok) {
+      // Quitar animación de pulso (ya evaluó)
+      var ob = document.getElementById('rating-open-btn');
+      if (ob) {
+        ob.classList.remove('rating-pulse','border-brand-400','text-brand-600');
+        ob.classList.add('border-gray-200','text-gray-600');
+      }
+      // Cerrar modal tras breve feedback
+      document.getElementById('rating-feedback').classList.remove('hidden');
+      setTimeout(function(){ closeRatingModal(); }, 1200);
+      _selectedRating = '';
+      document.querySelectorAll('.rating-face').forEach(function(btn){
+        btn.classList.remove('border-brand-400','border-red-400','border-amber-400',
+                             'bg-brand-50','bg-red-50','bg-amber-50');
+      });
+      document.getElementById('rating-comment').value = '';
+      document.getElementById('rating-value').value = '';
+    }
+  }).catch(function(){});
+}
+</script>
+
 {% endblock %}

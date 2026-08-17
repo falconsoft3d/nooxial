@@ -119,4 +119,7 @@ urlpatterns = [
     # Recuperación de contraseña
     path('forgot-password/',               views.forgot_password_view, name='forgot_password'),
     path('reset-password/<uuid:token>/',   views.reset_password_view,  name='reset_password'),
+    # Evaluaciones de plataforma
+    path('api/evaluar/',        views.platform_rating_submit,  name='platform_rating_submit'),
+    path('panel/evaluaciones/', views.admin_platform_ratings,  name='admin_platform_ratings'),
 ]

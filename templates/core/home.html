@@ -137,6 +137,55 @@
   </div>
 </section>
 
+<!-- ─── RATINGS BANNER ───────────────────────────────────────── -->
+{% if happy_ratings %}
+<section class="py-8 bg-white border-y border-gray-100">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="flex items-center justify-between mb-5">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">😊</span>
+        <h2 class="text-xs font-bold text-gray-500 uppercase tracking-widest">Lo que dicen nuestros usuarios</h2>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="ratingsScroll(-1)" aria-label="Anterior"
+                class="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+          </svg>
+        </button>
+        <button onclick="ratingsScroll(1)" aria-label="Siguiente"
+                class="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div id="ratings-track" class="flex gap-4 overflow-x-auto scroll-smooth pb-2"
+         style="scrollbar-width:none;-ms-overflow-style:none;">
+      {% for r in happy_ratings %}
+      <div class="flex-shrink-0 bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 flex items-start gap-3 w-60">
+        <span class="text-2xl flex-shrink-0">😊</span>
+        <div class="min-w-0">
+          <p class="font-semibold text-gray-900 text-sm truncate">{{ r.user.get_full_name|default:r.user.username }}</p>
+          {% if r.comment %}
+          <p class="text-xs text-gray-500 mt-0.5">{{ r.comment|truncatechars:100 }}</p>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <style>#ratings-track::-webkit-scrollbar{display:none}</style>
+  <script>
+  function ratingsScroll(dir) {
+    var t = document.getElementById('ratings-track');
+    t.scrollBy({ left: dir * 280, behavior: 'smooth' });
+  }
+  </script>
+</section>
+{% endif %}
+
 <!-- ─── FEATURED COURSES ──────────────────────────────────────── -->
 <section id="cursos" class="py-20 px-6">
   <div class="max-w-6xl mx-auto">
@@ -166,6 +215,13 @@
           {% endwith %}
           <h3 class="font-bold text-lg mt-1 leading-snug">{{ course.title }}</h3>
           <p class="text-sm text-gray-500 mt-2">{{ course.instructor.get_full_name|default:course.instructor.username }}</p>
+          <p class="text-xs text-gray-400 mt-1 flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            {{ course.enrollment_count }} inscrito{{ course.enrollment_count|pluralize:"s" }}
+          </p>
           <div class="mt-4 flex items-center justify-between">
             {% if course.avg_rating %}
             <div class="flex items-center gap-1">
