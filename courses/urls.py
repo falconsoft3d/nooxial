@@ -29,8 +29,18 @@ urlpatterns = [
     path('mis-docs/pizarra/<int:whiteboard_id>/guardar/', views.my_docs_whiteboard_save, name='my_docs_whiteboard_save'),
     path('mis-docs/pizarra/<int:whiteboard_id>/eliminar/', views.my_docs_whiteboard_delete, name='my_docs_whiteboard_delete'),
     path('mis-docs/pizarra/<int:whiteboard_id>/compartir/', views.my_docs_whiteboard_share, name='my_docs_whiteboard_share'),
+    # CAD
+    path('mis-docs/carpeta/<int:folder_id>/cad/nuevo/', views.my_docs_cad_new, name='my_docs_cad_new'),
+    path('mis-docs/cad/<int:cad_id>/', views.my_docs_cad, name='my_docs_cad'),
+    path('mis-docs/cad/<int:cad_id>/guardar/', views.my_docs_cad_save, name='my_docs_cad_save'),
+    path('mis-docs/cad/<int:cad_id>/eliminar/', views.my_docs_cad_delete, name='my_docs_cad_delete'),
+    # Capturador de archivos
+    path('mis-docs/carpeta/<int:folder_id>/capturador/', views.folder_capture_toggle, name='folder_capture_toggle'),
+    path('captura/<uuid:token>/', views.folder_capture_view, name='folder_capture_view'),
+    path('captura/<uuid:token>/subir/', views.folder_capture_upload, name='folder_capture_upload'),
     # Compartir carpeta directamente con usuario/empresa
     path('mis-docs/carpeta/<int:folder_id>/compartir-con/', views.folder_share_api,    name='folder_share_api'),
+    path('mis-docs/carpeta/<int:folder_id>/compartir-con-todos/', views.folder_share_all, name='folder_share_all'),
     path('mis-docs/api/buscar-destinatarios/',              views.folder_share_search, name='folder_share_search'),
     path('mis-docs/compartida/<int:folder_id>/',            views.shared_folder_view,  name='shared_folder_view'),
     # Presentaciones

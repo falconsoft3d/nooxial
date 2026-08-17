@@ -1,0 +1,439 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ cad.title }} – CAD – Nooxial{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ── Ocultar sidebar y padding en el editor CAD ── */
+#sidebar              { display: none !important; }
+#main-content         { margin-left: 0 !important; }
+#main-content > .p-8  { padding: 0 !important; }
+
+/* ── Layout del editor ── */
+#cad-editor {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 65px); /* 65px = altura del header sticky */
+}
+#cad-toolstrip {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: #1a1a35;
+  padding: 7px 10px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #252545;
+  user-select: none;
+}
+#cad-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+#cad-canvas-area {
+  flex: 1;
+  position: relative;
+  background: #0f0f22;
+  min-width: 0;
+  overflow: hidden;
+}
+#cad-canvas-area canvas { display: block; }
+#cad-props-panel {
+  width: 168px;
+  flex-shrink: 0;
+  background: #1a1a35;
+  padding: 12px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  overflow-y: auto;
+  border-left: 1px solid #252545;
+}
+
+/* ── Botones toolbar ── */
+.cad-btn {
+  height: 30px;
+  border-radius: 7px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: #26264a;
+  color: #7070a0;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 9px;
+  white-space: nowrap;
+  transition: .1s;
+}
+.cad-btn:hover  { background: #333360; color: #ddd; }
+.cad-btn.active { background: #9fe870; color: #0f0f22; }
+.cad-sep { width: 1px; height: 20px; background: #252545; margin: 0 3px; flex-shrink: 0; }
+
+/* ── Panel propiedades ── */
+.prop-label { font-size: 10px; color: #555575; text-transform: uppercase; letter-spacing: .05em; }
+.prop-row   { display: flex; flex-direction: column; gap: 3px; }
+#cad-props-panel input[type=color]  { width:100%; height:26px; border:none; border-radius:5px; cursor:pointer; padding:0; }
+#cad-props-panel input[type=range]  { width:100%; accent-color:#9fe870; }
+#cad-props-panel input[type=number] { width:100%; background:#0f0f22; border:1px solid #2a2a4a; color:#ccc; border-radius:5px; padding:3px 6px; font-size:12px; }
+
+/* ── Status bar ── */
+#cad-status { position:absolute; bottom:7px; left:10px; font-size:11px; color:#333355; pointer-events:none; z-index:2; }
+</style>
+{% endblock %}
+
+{% block topbar %}
+<div class="flex items-center gap-3 min-w-0 flex-1">
+  <a href="{% if cad.folder %}{% url 'courses:my_docs_folder' cad.folder.pk %}{% else %}{% url 'courses:my_docs' %}{% endif %}"
+     class="text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+    </svg>
+  </a>
+  <input type="text" id="cad-title" value="{{ cad.title }}"
+         class="text-base font-bold text-gray-900 bg-transparent border-0 focus:outline-none focus:ring-2 focus:ring-brand-300 rounded-lg px-2 py-1 w-56"
+         placeholder="Título del plano"
+         onblur="saveCad()" onkeydown="if(event.key==='Enter'){this.blur();}">
+  <span id="cad-save-status" class="text-xs text-gray-400 hidden sm:inline">Autoguardado</span>
+</div>
+<div class="flex items-center gap-2 flex-shrink-0">
+  <button onclick="saveCad()" class="px-3 py-1.5 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-700 transition-colors">Guardar</button>
+  <button onclick="exportPNG()" class="px-3 py-1.5 text-sm font-semibold border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition-colors">PNG</button>
+  <form method="post" action="{% url 'courses:my_docs_cad_delete' cad.pk %}" onsubmit="return confirm('¿Eliminar este plano?')">
+    {% csrf_token %}
+    <button type="submit" class="px-3 py-1.5 text-sm font-semibold text-red-500 border border-red-100 rounded-xl hover:bg-red-50 transition-colors">Eliminar</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="cad-editor">
+
+  <!-- Toolstrip (fuera del canvas, sin conflictos de eventos) -->
+  <div id="cad-toolstrip">
+    <button class="cad-btn active" id="btn-select"   onclick="setTool('select')"   title="Seleccionar  V">⬆ Seleccionar</button>
+    <button class="cad-btn"        id="btn-line"     onclick="setTool('line')"     title="Línea  L">╱ Línea</button>
+    <button class="cad-btn"        id="btn-rect"     onclick="setTool('rect')"     title="Rectángulo  R">▭ Rect</button>
+    <button class="cad-btn"        id="btn-circle"   onclick="setTool('circle')"   title="Círculo  C">○ Círculo</button>
+    <button class="cad-btn"        id="btn-polyline" onclick="setTool('polyline')" title="Polilínea  P">╲╱ Polilínea</button>
+    <button class="cad-btn"        id="btn-text"     onclick="setTool('text')"     title="Texto  T">T Texto</button>
+    <div class="cad-sep"></div>
+    <button class="cad-btn active" id="btn-grid"     onclick="toggleGrid()"        title="Cuadrícula  G">⊞ Grid</button>
+    <button class="cad-btn active" id="btn-snap"     onclick="toggleSnap()"        title="Snap  S">⊕ Snap</button>
+    <div class="cad-sep"></div>
+    <button class="cad-btn" onclick="cadUndo()"        title="Ctrl+Z">↩ Deshacer</button>
+    <button class="cad-btn" onclick="deleteSelected()" title="Del" style="color:#d06060">✕ Borrar</button>
+    <div class="cad-sep"></div>
+    <button class="cad-btn" onclick="zoomOut()"   title="Alejar">−</button>
+    <button class="cad-btn" onclick="zoomReset()"><span id="zoom-pct">100</span>%</button>
+    <button class="cad-btn" onclick="zoomIn()"    title="Acercar">+</button>
+  </div>
+
+  <!-- Cuerpo: canvas + panel propiedades -->
+  <div id="cad-body">
+
+    <div id="cad-canvas-area">
+      <canvas id="cad-canvas"></canvas>
+      <div id="cad-status">X: <span id="pos-x">0</span> &nbsp; Y: <span id="pos-y">0</span></div>
+    </div>
+
+    <div id="cad-props-panel">
+      <p style="font-size:10px;color:#9fe870;font-weight:700;letter-spacing:.08em;margin:0">PROPIEDADES</p>
+
+      <div class="prop-row">
+        <span class="prop-label">Color línea</span>
+        <input type="color" id="prop-stroke" value="#9fe870" oninput="applyProps()">
+      </div>
+      <div class="prop-row">
+        <span class="prop-label">Relleno</span>
+        <input type="color" id="prop-fill" value="#2d2d50" oninput="applyProps()">
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555;cursor:pointer;margin-top:2px">
+          <input type="checkbox" id="prop-fill-none" checked onchange="applyProps()" style="accent-color:#9fe870">
+          Sin relleno
+        </label>
+      </div>
+      <div class="prop-row">
+        <span class="prop-label">Grosor: <span id="stroke-val">1</span>px</span>
+        <input type="range" id="prop-strokew" min="0.5" max="10" step="0.5" value="1"
+               oninput="document.getElementById('stroke-val').textContent=this.value;applyProps()">
+      </div>
+      <div class="prop-row">
+        <span class="prop-label">Escala 1px =</span>
+        <div style="display:flex;align-items:center;gap:5px">
+          <input type="number" id="prop-scale" value="1" min="0.01" step="0.01" style="width:52px">
+          <span style="color:#444;font-size:11px">cm</span>
+        </div>
+      </div>
+
+      <hr style="border-color:#222240;margin:2px 0">
+      <p style="font-size:10px;color:#404060;line-height:1.8;margin:0">
+        <b style="color:#555575">V</b> Seleccionar<br>
+        <b style="color:#555575">L</b> Línea &nbsp; <b style="color:#555575">R</b> Rect<br>
+        <b style="color:#555575">C</b> Círculo &nbsp; <b style="color:#555575">P</b> Polilin.<br>
+        <b style="color:#555575">T</b> Texto<br>
+        <b style="color:#555575">G</b> Grid &nbsp; <b style="color:#555575">S</b> Snap<br>
+        <b style="color:#555575">Esc</b> Cancelar<br>
+        <b style="color:#555575">Del</b> Borrar<br>
+        <b style="color:#555575">Ctrl+Z</b> Deshacer<br>
+        <b style="color:#555575">Rueda</b> Zoom<br>
+        <b style="color:#555575">Btn medio</b> Pan
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+<script>
+var CAD_ID   = {{ cad.pk }};
+var CSRF     = document.querySelector('[name=csrfmiddlewaretoken]').value;
+var SAVE_URL = '/dashboard/mis-docs/cad/' + CAD_ID + '/guardar/';
+
+// ── Canvas ────────────────────────────────────────────────────
+var area   = document.getElementById('cad-canvas-area');
+var canvas = new fabric.Canvas('cad-canvas', {
+  width:  area.clientWidth,
+  height: area.clientHeight,
+  backgroundColor: '#0f0f22',
+  selection: true,
+  fireRightClick: true,
+  stopContextMenu: true,
+});
+
+window.addEventListener('resize', function() {
+  canvas.setWidth(area.clientWidth);
+  canvas.setHeight(area.clientHeight);
+  drawGrid(); canvas.renderAll();
+});
+
+// ── Grid ──────────────────────────────────────────────────────
+var GRID_SIZE = 20, gridOn = true, snapOn = true, gridLines = [];
+
+function drawGrid() {
+  gridLines.forEach(function(l) { canvas.remove(l); });
+  gridLines = [];
+  if (!gridOn) return;
+  var w = canvas.getWidth(), h = canvas.getHeight();
+  for (var x = 0; x <= w; x += GRID_SIZE) {
+    var l = new fabric.Line([x, 0, x, h], { stroke:'#18183a', strokeWidth:1, selectable:false, evented:false, excludeFromExport:true });
+    canvas.add(l); canvas.sendToBack(l); gridLines.push(l);
+  }
+  for (var y = 0; y <= h; y += GRID_SIZE) {
+    var l = new fabric.Line([0, y, w, y], { stroke:'#18183a', strokeWidth:1, selectable:false, evented:false, excludeFromExport:true });
+    canvas.add(l); canvas.sendToBack(l); gridLines.push(l);
+  }
+  canvas.renderAll();
+}
+drawGrid();
+
+function toggleGrid() {
+  gridOn = !gridOn;
+  document.getElementById('btn-grid').classList.toggle('active', gridOn);
+  drawGrid();
+}
+function toggleSnap() {
+  snapOn = !snapOn;
+  document.getElementById('btn-snap').classList.toggle('active', snapOn);
+}
+function snapVal(v) { return snapOn ? Math.round(v / GRID_SIZE) * GRID_SIZE : v; }
+
+// ── Tools ─────────────────────────────────────────────────────
+var tool = 'select', drawing = false, startX, startY, currentShape;
+var polyPoints = null, polyLines = [];
+
+function setTool(t) {
+  tool = t;
+  canvas.isDrawingMode = false;
+  canvas.selection = (t === 'select');
+  canvas.forEachObject(function(o) { o.selectable = (t === 'select'); });
+  ['select','line','rect','circle','polyline','text'].forEach(function(n) {
+    var el = document.getElementById('btn-' + n);
+    if (el) el.classList.toggle('active', n === t);
+  });
+  if (t !== 'polyline') finishPolyline();
+  canvas.defaultCursor = t === 'select' ? 'default' : 'crosshair';
+}
+
+// ── Props ─────────────────────────────────────────────────────
+function getStroke()  { return document.getElementById('prop-stroke').value; }
+function getStrokeW() { return parseFloat(document.getElementById('prop-strokew').value); }
+function getFill()    { return document.getElementById('prop-fill-none').checked ? 'transparent' : document.getElementById('prop-fill').value; }
+
+function applyProps() {
+  var obj = canvas.getActiveObject();
+  if (!obj) return;
+  obj.set({ stroke: getStroke(), strokeWidth: getStrokeW(), fill: getFill() });
+  canvas.renderAll();
+}
+
+// ── Mouse ─────────────────────────────────────────────────────
+var panning = false, panStart = {}, spaceDown = false;
+
+canvas.on('mouse:down', function(e) {
+  if (e.e.button === 1 || (spaceDown && tool === 'select')) {
+    panning = true; panStart = { x: e.e.clientX, y: e.e.clientY }; return;
+  }
+  if (tool === 'select') return;
+  var p = canvas.getPointer(e.e);
+  var x = snapVal(p.x), y = snapVal(p.y);
+
+  if (tool === 'text') {
+    var txt = new fabric.IText('Texto', { left:x, top:y, fontSize:14, fill:getStroke(), fontFamily:'monospace', selectable:true });
+    canvas.add(txt); canvas.setActiveObject(txt); txt.enterEditing();
+    schedSave(); return;
+  }
+  if (tool === 'polyline') {
+    if (!polyPoints) { polyPoints = [{ x, y }]; polyLines = []; }
+    polyPoints.push({ x, y });
+    var prev = polyPoints[polyPoints.length - 2];
+    var l = new fabric.Line([prev.x, prev.y, x, y], { stroke:getStroke(), strokeWidth:getStrokeW(), selectable:false, evented:false });
+    canvas.add(l); polyLines.push(l); canvas.renderAll(); return;
+  }
+  drawing = true; startX = x; startY = y;
+  if (tool === 'line') {
+    currentShape = new fabric.Line([x, y, x, y], { stroke:getStroke(), strokeWidth:getStrokeW(), selectable:false });
+  } else if (tool === 'rect') {
+    currentShape = new fabric.Rect({ left:x, top:y, width:0, height:0, stroke:getStroke(), strokeWidth:getStrokeW(), fill:getFill(), selectable:false });
+  } else if (tool === 'circle') {
+    currentShape = new fabric.Ellipse({ left:x, top:y, rx:0, ry:0, stroke:getStroke(), strokeWidth:getStrokeW(), fill:getFill(), selectable:false });
+  }
+  if (currentShape) canvas.add(currentShape);
+});
+
+canvas.on('mouse:move', function(e) {
+  var p = canvas.getPointer(e.e);
+  document.getElementById('pos-x').textContent = Math.round(p.x);
+  document.getElementById('pos-y').textContent = Math.round(p.y);
+  if (panning) {
+    var vpt = canvas.viewportTransform.slice();
+    vpt[4] += e.e.clientX - panStart.x; vpt[5] += e.e.clientY - panStart.y;
+    canvas.setViewportTransform(vpt); panStart = { x:e.e.clientX, y:e.e.clientY }; return;
+  }
+  if (!drawing || !currentShape) return;
+  var x = snapVal(p.x), y = snapVal(p.y), dx = x - startX, dy = y - startY;
+  if      (tool === 'line')   { currentShape.set({ x2:x, y2:y }); }
+  else if (tool === 'rect')   { currentShape.set({ left:dx<0?x:startX, top:dy<0?y:startY, width:Math.abs(dx), height:Math.abs(dy) }); }
+  else if (tool === 'circle') { currentShape.set({ left:startX+(dx<0?dx:0), top:startY+(dy<0?dy:0), rx:Math.abs(dx)/2, ry:Math.abs(dy)/2 }); }
+  canvas.renderAll();
+});
+
+canvas.on('mouse:up', function() {
+  panning = false;
+  if (!drawing) return;
+  drawing = false;
+  if (currentShape) { currentShape.set({ selectable:true, evented:true }); canvas.setActiveObject(currentShape); }
+  currentShape = null; schedSave();
+});
+
+canvas.on('mouse:dblclick', function() { if (tool === 'polyline') finishPolyline(); });
+
+function finishPolyline() {
+  if (!polyPoints || polyPoints.length < 2) { polyPoints = null; polyLines = []; return; }
+  polyLines.forEach(function(l) { canvas.remove(l); });
+  var poly = new fabric.Polyline(polyPoints, { stroke:getStroke(), strokeWidth:getStrokeW(), fill:getFill(), selectable:true });
+  canvas.add(poly); polyPoints = null; polyLines = [];
+  canvas.renderAll(); schedSave();
+}
+
+canvas.on('object:moving', function(e) {
+  if (!snapOn) return;
+  e.target.set({ left: snapVal(e.target.left), top: snapVal(e.target.top) });
+});
+
+// ── Zoom ──────────────────────────────────────────────────────
+canvas.on('mouse:wheel', function(opt) {
+  var z = Math.min(Math.max(canvas.getZoom() * (0.999 ** opt.e.deltaY), 0.1), 10);
+  canvas.zoomToPoint({ x:opt.e.offsetX, y:opt.e.offsetY }, z);
+  document.getElementById('zoom-pct').textContent = Math.round(z * 100);
+  opt.e.preventDefault(); opt.e.stopPropagation();
+});
+function zoomIn()    { var z=Math.min(canvas.getZoom()*1.2,10);  canvas.setZoom(z); document.getElementById('zoom-pct').textContent=Math.round(z*100); }
+function zoomOut()   { var z=Math.max(canvas.getZoom()/1.2,.1);  canvas.setZoom(z); document.getElementById('zoom-pct').textContent=Math.round(z*100); }
+function zoomReset() { canvas.setZoom(1); canvas.absolutePan({x:0,y:0}); document.getElementById('zoom-pct').textContent=100; }
+
+// ── Pan con Space ─────────────────────────────────────────────
+document.addEventListener('keydown', function(e) { if (e.code==='Space'&&!e.target.matches('input,textarea')) { spaceDown=true; e.preventDefault(); } });
+document.addEventListener('keyup',   function(e) { if (e.code==='Space') spaceDown=false; });
+
+// ── Teclado ───────────────────────────────────────────────────
+document.addEventListener('keydown', function(e) {
+  if (e.target.matches('input,textarea')) return;
+  var k = e.key.toLowerCase();
+  if      (k==='v') setTool('select');
+  else if (k==='l') setTool('line');
+  else if (k==='r') setTool('rect');
+  else if (k==='c') setTool('circle');
+  else if (k==='p') setTool('polyline');
+  else if (k==='t') setTool('text');
+  else if (k==='g') toggleGrid();
+  else if (k==='s'&&!e.ctrlKey) toggleSnap();
+  else if (k==='delete'||k==='backspace') deleteSelected();
+  else if (k==='z'&&e.ctrlKey) cadUndo();
+  else if (k==='escape') { finishPolyline(); setTool('select'); }
+});
+
+// ── Undo ──────────────────────────────────────────────────────
+var history = [];
+function saveHistory() {
+  var s = JSON.stringify(canvas.toJSON(['excludeFromExport']));
+  if (history[history.length-1] !== s) { history.push(s); if (history.length>50) history.shift(); }
+}
+canvas.on('object:added',    saveHistory);
+canvas.on('object:modified', saveHistory);
+canvas.on('object:removed',  saveHistory);
+
+function cadUndo() {
+  if (history.length < 2) return;
+  history.pop();
+  canvas.loadFromJSON(history[history.length-1], function() { drawGrid(); canvas.renderAll(); });
+}
+function deleteSelected() {
+  canvas.getActiveObjects().forEach(function(o) { canvas.remove(o); });
+  canvas.discardActiveObject(); canvas.renderAll(); schedSave();
+}
+
+// ── Export PNG ────────────────────────────────────────────────
+function exportPNG() {
+  gridLines.forEach(function(l) { l.visible=false; }); canvas.renderAll();
+  var url = canvas.toDataURL({ format:'png', multiplier:2 });
+  gridLines.forEach(function(l) { l.visible=true; }); canvas.renderAll();
+  var a = document.createElement('a');
+  a.href=url; a.download=(document.getElementById('cad-title').value||'plano')+'.png'; a.click();
+}
+
+// ── Save ──────────────────────────────────────────────────────
+var saveTimer = null;
+function schedSave() { clearTimeout(saveTimer); saveTimer = setTimeout(saveCad, 3000); }
+function saveCad() {
+  var data = canvas.toJSON(['excludeFromExport']);
+  data.objects = (data.objects||[]).filter(function(o) { return !o.excludeFromExport; });
+  fetch(SAVE_URL, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'X-CSRFToken':CSRF },
+    body: JSON.stringify({ title: document.getElementById('cad-title').value, data: JSON.stringify(data) }),
+    keepalive: true,
+  }).then(function(r){ return r.json(); }).then(function(d) {
+    if (d.ok) {
+      var st = document.getElementById('cad-save-status');
+      st.textContent = 'Guardado ✓';
+      setTimeout(function(){ st.textContent = 'Autoguardado'; }, 2000);
+    }
+  });
+}
+canvas.on('object:modified', schedSave);
+
+// ── Load ──────────────────────────────────────────────────────
+(function() {
+  var raw = {{ cad.data|default:'""'|safe }};
+  if (!raw) return;
+  try {
+    var parsed = typeof raw==='string' ? JSON.parse(raw) : raw;
+    canvas.loadFromJSON(parsed, function() { drawGrid(); canvas.renderAll(); });
+  } catch(e) {}
+})();
+</script>
+{% endblock %}

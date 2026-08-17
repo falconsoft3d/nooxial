@@ -568,8 +568,10 @@ class UserFolder(models.Model):
                                    related_name='children')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    share_token = models.UUIDField(null=True, blank=True, unique=True, verbose_name='Token de compartir')
-    view_count  = models.PositiveIntegerField(default=0, verbose_name='Aperturas')
+    share_token     = models.UUIDField(null=True, blank=True, unique=True, verbose_name='Token de compartir')
+    view_count      = models.PositiveIntegerField(default=0, verbose_name='Aperturas')
+    shared_with_all = models.BooleanField(default=False, verbose_name='Compartida con todos')
+    capture_token   = models.UUIDField(null=True, blank=True, unique=True, verbose_name='Token de captura')
 
     class Meta:
         verbose_name        = 'Carpeta personal'
@@ -672,9 +674,31 @@ class UserWhiteboard(models.Model):
     def is_shared(self):
         return self.share_token is not None
 
-    @property
-    def is_shared(self):
-        return self.share_token is not None
+
+# ─── PLANOS CAD ───────────────────────────────────────────────────────────────
+
+class UserCAD(models.Model):
+    folder      = models.ForeignKey(
+        UserFolder, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='cad_files', verbose_name='Carpeta'
+    )
+    user        = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='my_cad_files', verbose_name='Usuario'
+    )
+    title       = models.CharField(max_length=255, default='Plano sin título', verbose_name='Título')
+    data        = models.TextField(blank=True, default='', verbose_name='Datos JSON (Fabric.js)')
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = 'Plano CAD'
+        verbose_name_plural = 'Planos CAD'
+        ordering            = ['-updated_at']
+
+    def __str__(self):
+        return self.title
+
 
 class FolderShare(models.Model):
     folder       = models.ForeignKey('UserFolder', on_delete=models.CASCADE,

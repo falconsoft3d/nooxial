@@ -718,7 +718,7 @@ def teacher_thread(request, student_id):
 
 @login_required
 def my_docs(request, folder_id=None):
-    from courses.models import UserFolder, UserFile, UserNote, UserWhiteboard, FolderShare, UserPresentation
+    from courses.models import UserFolder, UserFile, UserNote, UserWhiteboard, FolderShare, UserPresentation, UserCAD
     from django.db.models import Q
     current = None
     if folder_id:
@@ -729,10 +729,12 @@ def my_docs(request, folder_id=None):
     notes         = UserNote.objects.filter(user=request.user, folder=current) if current else []
     whiteboards   = UserWhiteboard.objects.filter(user=request.user, folder=current) if current else []
     presentations = UserPresentation.objects.filter(user=request.user, folder=current) if current else []
+    cad_files     = UserCAD.objects.filter(user=request.user, folder=current) if current else []
     root_folders  = UserFolder.objects.filter(user=request.user, parent=None).order_by('name')
 
     # Carpetas compartidas conmigo (solo en la raíz)
     shared_folders = []
+    global_shared_folders = []
     if not current:
         try:
             company = request.user.profile.company
@@ -743,18 +745,25 @@ def my_docs(request, folder_id=None):
                                   (Q(with_company=company) if company else Q(pk__in=[])))
                           .select_related('folder', 'folder__user', 'shared_by')
                           .order_by('folder__name'))
+        global_shared_folders = (UserFolder.objects
+                                  .filter(shared_with_all=True)
+                                  .exclude(user=request.user)
+                                  .select_related('user')
+                                  .order_by('name'))
 
     return render(request, 'courses/my_docs.html', {
-        'active_nav':     'my_docs',
-        'current':        current,
-        'subfolders':     subfolders,
-        'files':          files,
-        'notes':          notes,
-        'whiteboards':    whiteboards,
-        'presentations':  presentations,
-        'root_folders':   root_folders,
-        'breadcrumb':     current.breadcrumb() if current else [],
-        'shared_folders': shared_folders,
+        'active_nav':            'my_docs',
+        'current':               current,
+        'subfolders':            subfolders,
+        'files':                 files,
+        'notes':                 notes,
+        'whiteboards':           whiteboards,
+        'presentations':         presentations,
+        'cad_files':             cad_files,
+        'root_folders':          root_folders,
+        'breadcrumb':            current.breadcrumb() if current else [],
+        'shared_folders':        shared_folders,
+        'global_shared_folders': global_shared_folders,
     })
 
 
@@ -1126,6 +1135,18 @@ def folder_share_search(request):
 
 
 @login_required
+@require_POST
+def folder_share_all(request, folder_id):
+    """Activa o desactiva compartir una carpeta con todos los usuarios."""
+    from courses.models import UserFolder
+    folder = get_object_or_404(UserFolder, pk=folder_id, user=request.user)
+    enable = request.POST.get('action', 'enable') == 'enable'
+    folder.shared_with_all = enable
+    folder.save(update_fields=['shared_with_all'])
+    return JsonResponse({'ok': True, 'shared_with_all': folder.shared_with_all})
+
+
+@login_required
 def shared_folder_view(request, folder_id):
     """Vista de lectura de una carpeta compartida directamente con el usuario."""
     from courses.models import UserFolder, UserFile, UserNote, UserWhiteboard, FolderShare
@@ -1139,7 +1160,7 @@ def shared_folder_view(request, folder_id):
     except Exception:
         company = None
 
-    has_access = FolderShare.objects.filter(
+    has_access = folder.shared_with_all or FolderShare.objects.filter(
         folder=folder
     ).filter(
         Q(with_user=request.user) | (Q(with_company=company) if company else Q(pk__in=[]))
@@ -1166,6 +1187,124 @@ def shared_folder_view(request, folder_id):
         'readonly':      True,
         'shared_owner':  folder.user,
     })
+
+
+# ─── CAPTURADOR DE ARCHIVOS ──────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def folder_capture_toggle(request, folder_id):
+    """Genera o revoca el token de captura de una carpeta."""
+    import uuid as _uuid
+    from courses.models import UserFolder
+    folder = get_object_or_404(UserFolder, pk=folder_id, user=request.user)
+    if folder.capture_token:
+        folder.capture_token = None
+    else:
+        folder.capture_token = _uuid.uuid4()
+    folder.save(update_fields=['capture_token'])
+    return JsonResponse({
+        'ok': True,
+        'active': folder.capture_token is not None,
+        'token': str(folder.capture_token) if folder.capture_token else None,
+    })
+
+
+def folder_capture_view(request, token):
+    """Página pública de captura: cualquiera con el link puede subir archivos."""
+    from courses.models import UserFolder
+    folder = get_object_or_404(UserFolder, capture_token=token)
+    return render(request, 'courses/folder_capture.html', {
+        'folder': folder,
+        'token': str(token),
+    })
+
+
+def folder_capture_upload(request, token):
+    """Recibe archivos arrastrados y los guarda en subcarpeta 'Importados'."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Método no permitido'}, status=405)
+    from courses.models import UserFolder, UserFile
+    folder = get_object_or_404(UserFolder, capture_token=token)
+
+    # Obtener o crear subcarpeta "Importados" dentro de la carpeta destino
+    importados, _ = UserFolder.objects.get_or_create(
+        user=folder.user,
+        parent=folder,
+        name='Importados',
+    )
+
+    uploaded = request.FILES.getlist('files')
+    if not uploaded:
+        return JsonResponse({'ok': False, 'error': 'Sin archivos'}, status=400)
+
+    MAX_SIZE = 50 * 1024 * 1024  # 50 MB por archivo
+    saved = []
+    for f in uploaded:
+        if f.size > MAX_SIZE:
+            continue
+        # Sanear el nombre: solo el basename
+        import os
+        safe_name = os.path.basename(f.name) or 'archivo'
+        UserFile.objects.create(
+            folder=importados,
+            user=folder.user,
+            name=safe_name,
+            file=f,
+        )
+        saved.append(safe_name)
+
+    return JsonResponse({'ok': True, 'saved': saved})
+
+
+# ─── PLANOS CAD ──────────────────────────────────────────────────────────────────
+
+@login_required
+def my_docs_cad_new(request, folder_id):
+    from courses.models import UserFolder, UserCAD
+    folder = get_object_or_404(UserFolder, pk=folder_id, user=request.user)
+    cad = UserCAD.objects.create(user=request.user, folder=folder)
+    return redirect('courses:my_docs_cad', cad_id=cad.pk)
+
+
+@login_required
+def my_docs_cad(request, cad_id):
+    from courses.models import UserCAD
+    cad = get_object_or_404(UserCAD, pk=cad_id, user=request.user)
+    return render(request, 'courses/cad.html', {
+        'active_nav': 'my_docs',
+        'cad': cad,
+    })
+
+
+@login_required
+@require_POST
+def my_docs_cad_save(request, cad_id):
+    import json
+    from courses.models import UserCAD
+    cad = get_object_or_404(UserCAD, pk=cad_id, user=request.user)
+    try:
+        body = json.loads(request.body)
+    except Exception:
+        return JsonResponse({'ok': False}, status=400)
+    title = body.get('title', '').strip() or 'Plano sin título'
+    data  = body.get('data', '')
+    cad.title = title
+    cad.data  = data if isinstance(data, str) else json.dumps(data)
+    cad.save(update_fields=['title', 'data', 'updated_at'])
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@require_POST
+def my_docs_cad_delete(request, cad_id):
+    from courses.models import UserCAD
+    cad = get_object_or_404(UserCAD, pk=cad_id, user=request.user)
+    folder_id = cad.folder_id
+    cad.delete()
+    if folder_id:
+        return redirect('courses:my_docs_folder', folder_id=folder_id)
+    return redirect('courses:my_docs')
 
 
 # ─── PRESENTACIONES ──────────────────────────────────────────────────────────────

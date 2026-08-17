@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Capturador – {{ folder.name }} – Nooxial{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-12 px-4">
+  <div class="w-full max-w-lg space-y-6">
+
+    <!-- Cabecera -->
+    <div class="text-center">
+      <div class="w-16 h-16 bg-brand-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+        </svg>
+      </div>
+      <h1 class="text-2xl font-black text-gray-900">Capturador de archivos</h1>
+      <p class="text-gray-500 mt-1 text-sm">
+        Carpeta: <strong class="text-gray-700">{{ folder.name }}</strong> ·
+        de <strong class="text-gray-700">{{ folder.user.get_full_name|default:folder.user.username }}</strong>
+      </p>
+      <p class="text-xs text-gray-400 mt-1">Los archivos que subas llegarán a la subcarpeta <strong>Importados</strong>.</p>
+    </div>
+
+    <!-- Zona de arrastre -->
+    <div id="drop-zone"
+         class="border-2 border-dashed border-gray-300 rounded-3xl p-10 text-center transition-all cursor-pointer
+                hover:border-brand-400 hover:bg-brand-50"
+         ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)"
+         onclick="document.getElementById('file-input').click()">
+      <div id="drop-icon" class="flex justify-center mb-4">
+        <svg class="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+        </svg>
+      </div>
+      <p id="drop-text" class="text-gray-500 font-medium">Arrastra archivos aquí</p>
+      <p class="text-xs text-gray-400 mt-1">o haz clic para seleccionar · máx. 50 MB por archivo</p>
+      <input type="file" id="file-input" multiple class="hidden" onchange="uploadFiles(this.files)">
+    </div>
+
+    <!-- Lista de archivos subidos -->
+    <div id="file-list" class="space-y-2 hidden">
+      <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Subidos en esta sesión</p>
+      <div id="file-items"></div>
+    </div>
+
+    <!-- Toast de resultado -->
+    <div id="toast"
+         class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold text-white z-50">
+    </div>
+
+    <p class="text-center text-xs text-gray-300">Capturador seguro · <a href="/" class="hover:text-brand-500">Nooxial</a></p>
+  </div>
+</div>
+
+<script>
+var UPLOAD_URL = '{% url "courses:folder_capture_upload" token %}';
+var CSRF_TOKEN = '{{ csrf_token }}';
+
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.add('border-brand-400','bg-brand-50');
+  document.getElementById('drop-text').textContent = 'Suelta para subir';
+}
+function onDragLeave(e) {
+  document.getElementById('drop-zone').classList.remove('border-brand-400','bg-brand-50');
+  document.getElementById('drop-text').textContent = 'Arrastra archivos aquí';
+}
+function onDrop(e) {
+  e.preventDefault();
+  onDragLeave(e);
+  uploadFiles(e.dataTransfer.files);
+}
+
+function uploadFiles(files) {
+  if (!files || !files.length) return;
+  var fd = new FormData();
+  var names = [];
+  for (var i = 0; i < files.length; i++) {
+    if (files[i].size > 50 * 1024 * 1024) {
+      showToast('❌ ' + files[i].name + ' supera 50 MB', 'error'); continue;
+    }
+    fd.append('files', files[i]);
+    names.push(files[i].name);
+  }
+  if (!names.length) return;
+
+  // Mostrar estado "subiendo"
+  names.forEach(function(name) { addFileItem(name, 'uploading'); });
+
+  fetch(UPLOAD_URL, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF_TOKEN },
+    body: fd,
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.ok) {
+      names.forEach(function(name) { updateFileItem(name, 'ok'); });
+      showToast('✓ ' + names.length + ' archivo' + (names.length > 1 ? 's' : '') + ' recibido' + (names.length > 1 ? 's' : ''), 'ok');
+    } else {
+      names.forEach(function(name) { updateFileItem(name, 'error'); });
+      showToast('❌ Error al subir: ' + (data.error || 'desconocido'), 'error');
+    }
+  })
+  .catch(function() {
+    names.forEach(function(name) { updateFileItem(name, 'error'); });
+    showToast('❌ Error de conexión', 'error');
+  });
+}
+
+function addFileItem(name, state) {
+  document.getElementById('file-list').classList.remove('hidden');
+  var el = document.createElement('div');
+  el.id = 'fi-' + btoa(encodeURIComponent(name)).replace(/=/g,'');
+  el.className = 'flex items-center gap-3 bg-white rounded-xl border border-gray-100 px-4 py-2.5';
+  el.innerHTML = stateIcon(state) + '<span class="text-sm text-gray-700 truncate flex-1">' + escHtml(name) + '</span>';
+  document.getElementById('file-items').appendChild(el);
+}
+
+function updateFileItem(name, state) {
+  var id = 'fi-' + btoa(encodeURIComponent(name)).replace(/=/g,'');
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.querySelector('.fi-icon').outerHTML = stateIcon(state);
+}
+
+function stateIcon(state) {
+  if (state === 'uploading') return '<span class="fi-icon text-blue-400 animate-spin text-lg">⟳</span>';
+  if (state === 'ok')        return '<span class="fi-icon text-brand-500 text-lg">✓</span>';
+  return '<span class="fi-icon text-red-400 text-lg">✕</span>';
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function showToast(msg, type) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold text-white z-50 '
+              + (type === 'ok' ? 'bg-gray-900' : 'bg-red-500');
+  t.classList.remove('hidden');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function() { t.classList.add('hidden'); }, 3500);
+}
+</script>
+{% endblock %}
