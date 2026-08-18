@@ -2,16 +2,29 @@ from courses.models import Enrollment, Course
 
 
 def nav_my_courses(request):
-    """Inyecta los cursos inscritos del usuario para el menú superior."""
+    """Inyecta cursos inscritos y contadores de nav para el sidebar."""
     if not request.user.is_authenticated:
-        return {'nav_my_courses': []}
+        return {'nav_my_courses': [], 'nav_courses_count': 0, 'nav_teachers_count': 0}
+    enrollments = Enrollment.objects.filter(student=request.user)
     courses = (
         Course.objects
         .filter(enrollments__student=request.user, is_published=True)
         .order_by('title')
         .only('title', 'slug', 'emoji')
     )
-    return {'nav_my_courses': list(courses)}
+    course_list = list(courses)
+    teachers_count = (
+        Course.objects
+        .filter(enrollments__student=request.user, is_published=True)
+        .values('instructor_id')
+        .distinct()
+        .count()
+    )
+    return {
+        'nav_my_courses':     course_list,
+        'nav_courses_count':  len(course_list),
+        'nav_teachers_count': teachers_count,
+    }
 
 
 def site_config(request):

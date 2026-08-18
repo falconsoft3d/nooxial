@@ -1,0 +1,200 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Enlaces guardados – Nooxial{% endblock %}
+
+{% block topbar %}
+<div class="flex items-center justify-between flex-1 gap-4">
+  <div>
+    <h1 class="text-lg font-bold text-gray-900">Enlaces guardados</h1>
+    <p class="text-sm text-gray-400">URLs con credenciales, públicas o privadas</p>
+  </div>
+  <button onclick="toggleModal('modal-link')"
+          class="flex items-center gap-2 bg-gray-900 text-white font-bold text-sm px-5 py-2.5 rounded-2xl hover:bg-gray-700 transition-colors">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    Nuevo enlace
+  </button>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if links %}
+<div class="bg-white rounded-2xl border border-gray-100 overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-gray-100 text-xs font-bold text-gray-400 uppercase tracking-wider">
+        <th class="px-4 py-3 text-left">Nombre</th>
+        <th class="px-4 py-3 text-left hidden md:table-cell">URL</th>
+        <th class="px-4 py-3 text-left hidden sm:table-cell">Usuario</th>
+        <th class="px-4 py-3 text-left hidden lg:table-cell">Contraseña</th>
+        <th class="px-4 py-3 text-left hidden lg:table-cell">Creado por</th>
+        <th class="px-4 py-3 text-center">Acceso</th>
+        <th class="px-4 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-50">
+      {% for lnk in links %}
+      <tr class="hover:bg-gray-50 transition-colors group">
+        <td class="px-4 py-3.5 font-medium text-gray-900 max-w-[180px]">
+          <a href="{{ lnk.url }}" target="_blank" rel="noopener"
+             class="hover:text-indigo-600 transition-colors truncate block">
+            {{ lnk.name }}
+          </a>
+        </td>
+        <td class="px-4 py-3.5 hidden md:table-cell max-w-[200px]">
+          <a href="{{ lnk.url }}" target="_blank" rel="noopener"
+             class="text-indigo-500 hover:text-indigo-700 truncate block text-xs">
+            {{ lnk.url|truncatechars:45 }}
+          </a>
+        </td>
+        <td class="px-4 py-3.5 hidden sm:table-cell text-gray-600 text-xs">
+          {% if lnk.link_user %}{{ lnk.link_user }}{% else %}<span class="text-gray-300">—</span>{% endif %}
+        </td>
+        <td class="px-4 py-3.5 hidden lg:table-cell text-xs">
+          {% if lnk.link_pass %}
+          <span class="font-mono tracking-wider select-none" data-pw="{{ lnk.link_pass }}">••••••••</span>
+          <button onclick="togglePw(this)"
+                  class="ml-1 text-gray-400 hover:text-gray-700 transition-colors">👁</button>
+          {% else %}
+          <span class="text-gray-300">—</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3.5 hidden lg:table-cell text-xs text-gray-500">
+          {{ lnk.user.get_full_name|default:lnk.user.username }}
+        </td>
+        <td class="px-4 py-3.5 text-center">
+          {% if lnk.user == request.user %}
+          <button onclick="toggleLinkPublic({{ lnk.pk }}, this)"
+                  data-public="{{ lnk.is_public|yesno:'true,false' }}"
+                  class="text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors
+                         {% if lnk.is_public %}bg-green-100 text-green-700 hover:bg-green-200{% else %}bg-gray-100 text-gray-500 hover:bg-gray-200{% endif %}">
+            {% if lnk.is_public %}🌐 Pública{% else %}🔒 Privada{% endif %}
+          </button>
+          {% else %}
+          <span class="text-xs text-green-600 font-semibold">🌐 Pública</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3.5 text-right">
+          {% if lnk.user == request.user %}
+          <form method="POST" action="{% url 'courses:my_docs_link_delete' lnk.pk %}"
+                onsubmit="return confirm('¿Eliminar «{{ lnk.name|escapejs }}»?')"
+                class="inline">
+            {% csrf_token %}
+            <button type="submit"
+                    class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="bg-white rounded-3xl border border-dashed border-gray-200 p-16 text-center">
+  <p class="text-5xl mb-4">🔗</p>
+  <p class="font-bold text-gray-700 text-lg">No hay enlaces guardados todavía</p>
+  <p class="text-sm text-gray-400 mt-1 mb-5">Guarda URLs con sus credenciales para acceso rápido</p>
+  <button onclick="toggleModal('modal-link')"
+          class="inline-flex items-center gap-2 bg-gray-900 text-white font-bold text-sm px-6 py-3 rounded-2xl hover:bg-gray-700 transition-colors">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    Nuevo enlace
+  </button>
+</div>
+{% endif %}
+
+<!-- Modal nuevo enlace -->
+<div id="modal-link" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+  <div class="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl">
+    <h2 class="font-black text-gray-900 text-lg mb-5">Nuevo enlace</h2>
+    <form method="POST" action="{% url 'courses:my_docs_link_create' %}" class="space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{% url 'courses:saved_links' %}">
+      <div>
+        <label class="block text-xs font-bold text-gray-500 mb-1">Nombre <span class="text-red-400">*</span></label>
+        <input type="text" name="name" required autofocus placeholder="Ej. Panel de control"
+               class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition"/>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 mb-1">URL <span class="text-red-400">*</span></label>
+        <input type="url" name="url" required placeholder="https://…"
+               class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition"/>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-gray-500 mb-1">Usuario</label>
+          <input type="text" name="link_user" placeholder="usuario"
+                 class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition"/>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-500 mb-1">Contraseña</label>
+          <input type="text" name="link_pass" placeholder="••••••••"
+                 class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition"/>
+        </div>
+      </div>
+      <label class="flex items-center gap-2 cursor-pointer select-none">
+        <input type="checkbox" name="is_public" value="1" checked
+               class="rounded border-gray-300 text-indigo-500 focus:ring-indigo-300"/>
+        <span class="text-sm text-gray-600">Visible para todos los usuarios</span>
+      </label>
+      <div class="flex gap-3 pt-1">
+        <button type="button" onclick="toggleModal('modal-link')"
+                class="flex-1 border border-gray-200 text-gray-600 font-semibold py-3 rounded-full hover:bg-gray-50 transition-colors text-sm">
+          Cancelar
+        </button>
+        <button type="submit"
+                class="flex-1 bg-indigo-600 text-white font-bold py-3 rounded-full hover:bg-indigo-700 transition-colors text-sm">
+          Guardar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function toggleModal(id) {
+  document.getElementById(id).classList.toggle('hidden');
+}
+document.getElementById('modal-link').addEventListener('click', function(e) {
+  if (e.target === this) toggleModal('modal-link');
+});
+
+function togglePw(btn) {
+  var span = btn.previousElementSibling;
+  if (span.textContent === '••••••••') {
+    span.textContent = span.dataset.pw;
+    btn.textContent = '🙈';
+  } else {
+    span.textContent = '••••••••';
+    btn.textContent = '👁';
+  }
+}
+
+function toggleLinkPublic(linkId, btn) {
+  var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  fetch('/dashboard/mis-docs/enlaces/' + linkId + '/toggle/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrf },
+  }).then(function(r){ return r.json(); }).then(function(data) {
+    if (data.is_public) {
+      btn.dataset.public = 'true';
+      btn.textContent = '🌐 Pública';
+      btn.className = btn.className.replace('bg-gray-100 text-gray-500 hover:bg-gray-200', 'bg-green-100 text-green-700 hover:bg-green-200');
+    } else {
+      btn.dataset.public = 'false';
+      btn.textContent = '🔒 Privada';
+      btn.className = btn.className.replace('bg-green-100 text-green-700 hover:bg-green-200', 'bg-gray-100 text-gray-500 hover:bg-gray-200');
+    }
+  });
+}
+</script>
+{% endblock %}

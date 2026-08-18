@@ -553,6 +553,8 @@
   </div>
 </div>
 
+<!-- Modal: nuevo enlace (eliminado - ver /dashboard/enlaces/) -->
+
 {% endblock %}
 
 {% block extra_scripts %}
@@ -566,7 +568,8 @@ function openRenameModal(folderId, currentName) {
   toggleModal('modal-rename');
 }
 ['modal-folder','modal-rename'].forEach(function(id) {
-  document.getElementById(id).addEventListener('click', function(e) {
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('click', function(e) {
     if (e.target === this) toggleModal(id);
   });
 });

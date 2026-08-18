@@ -267,7 +267,7 @@ def admin_users(request):
     elif filter == 'staff':
         qs = qs.filter(is_staff=True)
 
-    paginator = Paginator(qs, 15)
+    paginator = Paginator(qs, 10)
     page      = paginator.get_page(request.GET.get('page', 1))
 
     return render(request, 'accounts/admin_users.html', {
@@ -1025,7 +1025,7 @@ def admin_lessons(request):
     if q:
         qs = qs.filter(Q(title__icontains=q) | Q(content__icontains=q))
 
-    paginator = Paginator(qs, 15)
+    paginator = Paginator(qs, 10)
     page      = paginator.get_page(request.GET.get('page', 1))
 
     return render(request, 'accounts/admin_lessons.html', {
@@ -2813,3 +2813,13 @@ def api_all_versions(request):
             'features':    list(v.features.values('category', 'text')),
         })
     return JsonResponse({'versions': versions})
+
+
+@login_required
+@require_POST
+def api_nav_more_save(request):
+    expanded = request.POST.get('expanded') == '1'
+    request.user.profile.nav_more_expanded = expanded
+    request.user.profile.save(update_fields=['nav_more_expanded'])
+    return JsonResponse({'ok': True, 'expanded': expanded})
+

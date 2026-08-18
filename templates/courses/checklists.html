@@ -1,0 +1,161 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Listas de chequeo – Nooxial{% endblock %}
+
+{% block topbar %}
+<div class="flex items-center justify-between flex-1 gap-4">
+  <div>
+    <h1 class="text-lg font-bold text-gray-900">Listas de chequeo</h1>
+    <p class="text-sm text-gray-400">Crea listas de tareas públicas o privadas</p>
+  </div>
+  <button onclick="toggleModal('modal-new')"
+          class="flex items-center gap-2 bg-gray-900 text-white font-bold text-sm px-5 py-2.5 rounded-2xl hover:bg-gray-700 transition-colors">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    Nueva lista
+  </button>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if own %}
+<div class="mb-8">
+  <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Mis listas</p>
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+    {% for cl in own %}
+    <a href="{% url 'courses:checklist_detail' cl.pk %}"
+       class="group bg-white border border-gray-100 rounded-2xl p-5 hover:shadow-md hover:border-brand-200 transition-all flex flex-col gap-3">
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0
+                      {% if cl.is_public %}bg-brand-50{% else %}bg-gray-100{% endif %}">
+            <svg class="w-5 h-5 {% if cl.is_public %}text-brand-600{% else %}text-gray-400{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+            </svg>
+          </div>
+          <p class="font-bold text-gray-900 group-hover:text-brand-700 transition-colors leading-tight">{{ cl.name }}</p>
+        </div>
+        <span class="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0
+                     {% if cl.is_public %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-500{% endif %}">
+          {% if cl.is_public %}Pública{% else %}Privada{% endif %}
+        </span>
+      </div>
+
+      <!-- Barra de progreso -->
+      <div>
+        <div class="flex justify-between text-xs text-gray-400 mb-1">
+          <span>{{ cl.done_count }}/{{ cl.total_count }} tareas</span>
+          {% if cl.total_count %}
+          <span>{{ cl.done_count|floatformat:0 }}%</span>
+          {% endif %}
+        </div>
+        <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          {% if cl.total_count %}
+          <div class="h-full bg-brand-400 rounded-full transition-all"
+               style="width:{{ cl.done_count|stringformat:'d' }}00%/{{ cl.total_count }}"></div>
+          {% endif %}
+        </div>
+      </div>
+
+      <p class="text-xs text-gray-400">{{ cl.updated_at|date:"d M Y, H:i" }}</p>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if public %}
+<div>
+  <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+    <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    Listas públicas de otros usuarios
+  </p>
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+    {% for cl in public %}
+    <a href="{% url 'courses:checklist_detail' cl.pk %}"
+       class="group bg-green-50 border border-green-100 rounded-2xl p-5 hover:shadow-md transition-all flex flex-col gap-3">
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+            </svg>
+          </div>
+          <div>
+            <p class="font-bold text-gray-900 group-hover:text-green-700 transition-colors leading-tight">{{ cl.name }}</p>
+            <p class="text-xs text-gray-500">{{ cl.user.get_full_name|default:cl.user.username }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-between text-xs text-gray-400">
+        <span>{{ cl.done_count }}/{{ cl.total_count }} tareas</span>
+        <span>{{ cl.updated_at|date:"d M Y" }}</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if not own and not public %}
+<div class="bg-white rounded-3xl border border-dashed border-gray-200 p-16 text-center">
+  <p class="text-5xl mb-4">✅</p>
+  <p class="font-bold text-gray-700 text-lg">No hay listas todavía</p>
+  <p class="text-sm text-gray-400 mt-1 mb-5">Crea tu primera lista de chequeo</p>
+  <button onclick="toggleModal('modal-new')"
+          class="inline-flex items-center gap-2 bg-gray-900 text-white font-bold text-sm px-6 py-3 rounded-2xl hover:bg-gray-700 transition-colors">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    Nueva lista
+  </button>
+</div>
+{% endif %}
+
+<!-- Modal nueva lista -->
+<div id="modal-new" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+  <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl">
+    <h2 class="font-black text-gray-900 text-lg mb-5">Nueva lista de chequeo</h2>
+    <form method="POST" action="{% url 'courses:checklist_create' %}" class="space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-xs font-bold text-gray-500 mb-1">Nombre <span class="text-red-400">*</span></label>
+        <input type="text" name="name" required autofocus placeholder="Ej. Lista de compras"
+               class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 transition"/>
+      </div>
+      <label class="flex items-center gap-2 cursor-pointer select-none">
+        <input type="checkbox" name="is_public" value="1" checked
+               class="rounded border-gray-300 text-brand-500 focus:ring-brand-300"/>
+        <span class="text-sm text-gray-600">Visible para todos los usuarios</span>
+      </label>
+      <div class="flex gap-3 pt-1">
+        <button type="button" onclick="toggleModal('modal-new')"
+                class="flex-1 border border-gray-200 text-gray-600 font-semibold py-3 rounded-full hover:bg-gray-50 transition-colors text-sm">
+          Cancelar
+        </button>
+        <button type="submit"
+                class="flex-1 bg-gray-900 text-white font-bold py-3 rounded-full hover:bg-gray-700 transition-colors text-sm">
+          Crear
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function toggleModal(id) {
+  document.getElementById(id).classList.toggle('hidden');
+}
+document.getElementById('modal-new').addEventListener('click', function(e) {
+  if (e.target === this) toggleModal('modal-new');
+});
+</script>
+{% endblock %}

@@ -829,3 +829,64 @@ class UserPresentation(models.Model):
 
     def __str__(self):
         return self.title
+
+
+# ─── ENLACES GUARDADOS ───────────────────────────────────────────────────────
+
+class SavedLink(models.Model):
+    user       = models.ForeignKey(User, on_delete=models.CASCADE, related_name='saved_links')
+    name       = models.CharField(max_length=200, verbose_name='Nombre')
+    url        = models.URLField(max_length=2000, verbose_name='URL')
+    link_user  = models.CharField(max_length=200, blank=True, verbose_name='Usuario')
+    link_pass  = models.CharField(max_length=500, blank=True, verbose_name='Contraseña')
+    is_public  = models.BooleanField(default=True, verbose_name='Pública')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = 'Enlace guardado'
+        verbose_name_plural = 'Enlaces guardados'
+        ordering            = ['-created_at']
+
+    def __str__(self):
+        return self.name
+
+
+# ─── LISTAS DE CHEQUEO ───────────────────────────────────────────────────────
+
+class Checklist(models.Model):
+    user        = models.ForeignKey(User, on_delete=models.CASCADE, related_name='checklists')
+    name        = models.CharField(max_length=200, verbose_name='Nombre')
+    is_public   = models.BooleanField(default=True, verbose_name='Pública')
+    share_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = 'Lista de chequeo'
+        verbose_name_plural = 'Listas de chequeo'
+        ordering            = ['-updated_at']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def done_count(self):
+        return self.items.filter(is_done=True).count()
+
+    @property
+    def total_count(self):
+        return self.items.count()
+
+
+class ChecklistItem(models.Model):
+    checklist = models.ForeignKey(Checklist, on_delete=models.CASCADE, related_name='items')
+    text      = models.CharField(max_length=500, verbose_name='Tarea')
+    is_done   = models.BooleanField(default=False)
+    order     = models.PositiveSmallIntegerField(default=0)
+    duration  = models.PositiveSmallIntegerField(default=1, verbose_name='Duración (unidades)')
+
+    class Meta:
+        ordering = ['order', 'pk']
+
+    def __str__(self):
+        return self.text

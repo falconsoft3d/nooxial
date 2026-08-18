@@ -58,7 +58,8 @@ class UserProfile(models.Model):
     cv_experience  = models.TextField(blank=True, verbose_name='Experiencia laboral')
     cv_education   = models.TextField(blank=True, verbose_name='Formación académica')
     cv_skills      = models.TextField(blank=True, verbose_name='Habilidades y competencias')
-    cv_public      = models.BooleanField(default=False, verbose_name='Currículum público')
+    cv_public          = models.BooleanField(default=False, verbose_name='Currículum público')
+    nav_more_expanded  = models.BooleanField(default=False, verbose_name='Menú expandido')
 
     class Meta:
         verbose_name        = 'Perfil de usuario'

@@ -1,0 +1,403 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ cl.name }} – Listas – Nooxial{% endblock %}
+
+{% block topbar %}
+<div class="flex items-center justify-between flex-1 gap-4 min-w-0">
+  <div class="flex items-center gap-2 min-w-0">
+    <a href="{% url 'courses:checklists' %}" class="text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      </svg>
+    </a>
+    <h1 id="cl-title" class="text-lg font-bold text-gray-900 truncate">{{ cl.name }}</h1>
+    {% if is_owner %}
+    <button onclick="openRenameInline()" class="text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0" title="Renombrar">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+      </svg>
+    </button>
+    {% endif %}
+  </div>
+  <div class="flex items-center gap-2 flex-shrink-0">
+    <button id="tab-list-btn" onclick="showTab('list')"
+            class="text-xs font-semibold px-3 py-1.5 rounded-xl border transition-colors bg-gray-900 text-white border-gray-900">
+      ☰ Lista
+    </button>
+    <button id="tab-gantt-btn" onclick="showTab('gantt')"
+            class="text-xs font-semibold px-3 py-1.5 rounded-xl border transition-colors border-gray-200 text-gray-500 hover:bg-gray-50">
+      📊 Gantt
+    </button>
+    {% if is_owner %}
+    <button id="toggle-public-btn" onclick="togglePublic()"
+            data-public="{{ cl.is_public|yesno:'true,false' }}"
+            class="text-xs font-semibold px-3 py-1.5 rounded-xl border transition-colors
+                   {% if cl.is_public %}bg-green-50 border-green-200 text-green-700 hover:bg-green-100{% else %}bg-gray-100 border-gray-200 text-gray-500 hover:bg-gray-200{% endif %}">
+      {% if cl.is_public %}🌐 Pública{% else %}🔒 Privada{% endif %}
+    </button>
+    <button onclick="copyPublicLink()" title="Enlace público (sin login)"
+            class="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-50 transition-colors">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+      </svg>
+      Enlace
+    </button>
+    <form method="POST" action="{% url 'courses:checklist_delete' cl.pk %}"
+          onsubmit="return confirm('¿Eliminar «{{ cl.name|escapejs }}»?')">
+      {% csrf_token %}
+      <button type="submit" class="text-xs text-red-500 hover:text-red-700 border border-red-200 px-3 py-1.5 rounded-xl hover:bg-red-50 transition-colors font-semibold">Eliminar</button>
+    </form>
+    {% else %}
+    <span class="text-xs font-semibold px-3 py-1.5 rounded-xl bg-green-50 border border-green-200 text-green-700">
+      🌐 {{ cl.user.get_full_name|default:cl.user.username }}
+    </span>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-5">
+
+  <!-- Progreso -->
+  <div class="bg-white rounded-2xl border border-gray-100 p-5">
+    <div class="flex justify-between text-sm mb-2">
+      <span class="font-semibold text-gray-700">
+        <span id="done-count">{{ cl.done_count }}</span> de <span id="total-count">{{ cl.total_count }}</span> completadas
+      </span>
+      <span class="text-gray-400 text-xs" id="progress-pct">
+        {% if cl.total_count %}{% widthratio cl.done_count cl.total_count 100 %}%{% else %}0%{% endif %}
+      </span>
+    </div>
+    <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+      <div id="progress-bar" class="h-full bg-brand-400 rounded-full transition-all duration-300"
+           style="width:{% if cl.total_count %}{% widthratio cl.done_count cl.total_count 100 %}%{% else %}0%{% endif %}"></div>
+    </div>
+  </div>
+
+  <!-- VISTA LISTA -->
+  <div id="tab-list">
+    <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <ul id="item-list" class="divide-y divide-gray-50">
+        {% for item in cl.items.all %}
+        <li id="item-{{ item.pk }}" data-id="{{ item.pk }}" data-duration="{{ item.duration }}"
+            class="flex items-center gap-3 px-4 py-3 group hover:bg-gray-50 transition-colors">
+          {% if is_owner %}
+          <span class="drag-handle cursor-grab text-gray-300 hover:text-gray-500 flex-shrink-0 touch-none select-none" title="Arrastrar para ordenar">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+              <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+              <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+            </svg>
+          </span>
+          <button onclick="toggleItem({{ item.pk }}, this)"
+                  class="w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all
+                         {% if item.is_done %}bg-brand-500 border-brand-500{% else %}border-gray-300 hover:border-brand-400{% endif %}">
+            {% if item.is_done %}<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>{% endif %}
+          </button>
+          {% else %}
+          <span class="w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center
+                       {% if item.is_done %}bg-brand-500 border-brand-500{% else %}border-gray-300{% endif %}">
+            {% if item.is_done %}<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>{% endif %}
+          </span>
+          {% endif %}
+          <span class="flex-1 text-sm {% if item.is_done %}line-through text-gray-400{% else %}text-gray-800{% endif %}">{{ item.text }}</span>
+          {% if is_owner %}
+          <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+            <span class="text-xs text-gray-400">Dur:</span>
+            <input type="number" min="1" max="999" value="{{ item.duration }}"
+                   onchange="setDuration({{ item.pk }}, this)"
+                   class="w-12 text-xs text-center border border-gray-200 rounded-lg px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-brand-300"/>
+          </div>
+          <button onclick="deleteItem({{ item.pk }})"
+                  class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+          {% else %}
+          <span class="text-xs text-gray-300 flex-shrink-0">{{ item.duration }}u</span>
+          {% endif %}
+        </li>
+        {% empty %}
+        <li id="empty-msg" class="px-5 py-10 text-center text-gray-400 text-sm">
+          {% if is_owner %}Añade la primera tarea abajo{% else %}Esta lista no tiene tareas{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% if is_owner %}
+      <div class="border-t border-gray-100 px-4 py-3 flex gap-3">
+        <input id="new-item-input" type="text" placeholder="Nueva tarea…"
+               class="flex-1 text-sm bg-transparent outline-none placeholder-gray-400 text-gray-800"
+               onkeydown="if(event.key==='Enter'){addItem()}" maxlength="500"/>
+        <button onclick="addItem()" class="text-xs font-bold text-brand-600 hover:text-brand-800 transition-colors flex-shrink-0">+ Añadir</button>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- VISTA GANTT -->
+  <div id="tab-gantt" class="hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Diagrama de Gantt · secuencia</p>
+        <p class="text-xs text-gray-400">Cada barra = duración relativa de la tarea</p>
+      </div>
+      <div id="gantt-chart" class="p-5 space-y-2">
+        <p class="text-center text-gray-400 text-sm py-4">Cargando…</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs font-semibold px-5 py-3 rounded-2xl shadow-xl z-50"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script>
+var CSRF       = '{{ csrf_token }}';
+var CL_PK      = {{ cl.pk }};
+var PUBLIC_URL = '{{ public_url }}';
+var IS_OWNER   = {{ is_owner|yesno:'true,false' }};
+var GANTT_COLORS = ['#9fe870','#60a5fa','#f97316','#a78bfa','#34d399','#fb7185','#facc15','#38bdf8','#e879f9','#4ade80'];
+
+/* ── Tabs ── */
+function showTab(tab) {
+  var isList = tab === 'list';
+  document.getElementById('tab-list').classList.toggle('hidden', !isList);
+  document.getElementById('tab-gantt').classList.toggle('hidden', isList);
+  var lb = document.getElementById('tab-list-btn');
+  var gb = document.getElementById('tab-gantt-btn');
+  if (isList) {
+    lb.className = lb.className.replace('border-gray-200 text-gray-500 hover:bg-gray-50', 'bg-gray-900 text-white border-gray-900');
+    gb.className = gb.className.replace('bg-gray-900 text-white border-gray-900', 'border-gray-200 text-gray-500 hover:bg-gray-50');
+  } else {
+    gb.className = gb.className.replace('border-gray-200 text-gray-500 hover:bg-gray-50', 'bg-gray-900 text-white border-gray-900');
+    lb.className = lb.className.replace('bg-gray-900 text-white border-gray-900', 'border-gray-200 text-gray-500 hover:bg-gray-50');
+    renderGantt();
+  }
+}
+
+/* ── Gantt ── */
+function renderGantt() {
+  var items    = Array.from(document.querySelectorAll('#item-list li[data-id]'));
+  var chart    = document.getElementById('gantt-chart');
+  if (!chart) return;
+  if (!items.length) {
+    chart.innerHTML = '<p class="text-center text-gray-400 text-sm py-8">Añade tareas para ver el Gantt</p>';
+    return;
+  }
+  var totalDur = items.reduce(function(s, li) { return s + parseInt(li.dataset.duration || 1); }, 0);
+  chart.innerHTML = '';
+  var offset = 0;
+  items.forEach(function(li, idx) {
+    var dur      = parseInt(li.dataset.duration || 1);
+    var isDone   = li.querySelector('.bg-brand-500') !== null;
+    var textEl   = li.querySelector('span.flex-1');
+    var text     = textEl ? textEl.textContent.trim() : '';
+    var leftPct  = totalDur ? (offset / totalDur * 100).toFixed(2) : 0;
+    var widthPct = totalDur ? (dur / totalDur * 100).toFixed(2) : 100;
+    offset += dur;
+    var color    = isDone ? '#e5e7eb' : GANTT_COLORS[idx % GANTT_COLORS.length];
+    var textColor= isDone ? '#9ca3af' : '#1f2937';
+
+    var row = document.createElement('div');
+    row.className = 'flex items-center gap-3';
+    row.innerHTML =
+      '<div class="w-36 flex-shrink-0 text-right">'
+        + '<span class="text-xs font-medium truncate block ' + (isDone ? 'text-gray-400 line-through' : 'text-gray-700') + '" title="' + escHtml(text) + '">'
+        + escHtml(text.length > 20 ? text.slice(0, 19) + '…' : text)
+        + '</span>'
+      + '</div>'
+      + '<div class="flex-1 relative h-7 bg-gray-100 rounded-lg overflow-hidden">'
+        + '<div class="absolute top-0 h-full rounded-lg flex items-center px-2"'
+            + ' style="left:' + leftPct + '%;width:' + widthPct + '%;background:' + color + '">'
+          + '<span class="text-xs font-bold truncate" style="color:' + textColor + '">' + dur + 'u</span>'
+        + '</div>'
+      + '</div>'
+      + '<div class="w-5 flex-shrink-0 flex items-center justify-center">'
+        + (isDone ? '<svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>' : '')
+      + '</div>';
+    chart.appendChild(row);
+  });
+}
+
+/* ── SortableJS ── */
+if (IS_OWNER) {
+  document.addEventListener('DOMContentLoaded', function() {
+    var list = document.getElementById('item-list');
+    if (!list) return;
+    Sortable.create(list, {
+      handle: '.drag-handle',
+      animation: 150,
+      ghostClass: 'opacity-40',
+      onEnd: function() {
+        var ids = Array.from(list.querySelectorAll('li[data-id]')).map(function(li) {
+          return parseInt(li.dataset.id);
+        });
+        fetch('/dashboard/checklists/' + CL_PK + '/reorder/', {
+          method: 'POST',
+          headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+          body: JSON.stringify(ids),
+        });
+      },
+    });
+  });
+}
+
+/* ── Toast / Progreso ── */
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  clearTimeout(t._t);
+  t._t = setTimeout(function(){ t.classList.add('hidden'); }, 3000);
+}
+function updateProgress(done, total) {
+  document.getElementById('done-count').textContent = done;
+  document.getElementById('total-count').textContent = total;
+  var pct = total ? Math.round(done * 100 / total) : 0;
+  document.getElementById('progress-pct').textContent = pct + '%';
+  document.getElementById('progress-bar').style.width = pct + '%';
+}
+
+/* ── Toggle tarea ── */
+function toggleItem(itemId, btn) {
+  fetch('/dashboard/checklists/item/' + itemId + '/toggle/', {
+    method: 'POST', headers: { 'X-CSRFToken': CSRF },
+  }).then(r => r.json()).then(function(d) {
+    var li   = document.getElementById('item-' + itemId);
+    var text = li.querySelector('span.flex-1');
+    if (d.is_done) {
+      btn.classList.add('bg-brand-500','border-brand-500');
+      btn.classList.remove('border-gray-300','hover:border-brand-400');
+      btn.innerHTML = '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>';
+      text.classList.add('line-through','text-gray-400'); text.classList.remove('text-gray-800');
+    } else {
+      btn.classList.remove('bg-brand-500','border-brand-500');
+      btn.classList.add('border-gray-300','hover:border-brand-400');
+      btn.innerHTML = '';
+      text.classList.remove('line-through','text-gray-400'); text.classList.add('text-gray-800');
+    }
+    updateProgress(d.done, d.total);
+  });
+}
+
+/* ── Eliminar ── */
+function deleteItem(itemId) {
+  fetch('/dashboard/checklists/item/' + itemId + '/eliminar/', {
+    method: 'POST', headers: { 'X-CSRFToken': CSRF },
+  }).then(r => r.json()).then(function(d) {
+    document.getElementById('item-' + itemId).remove();
+    updateProgress(d.done, d.total);
+    if (!d.total) {
+      var ul = document.getElementById('item-list');
+      var msg = document.createElement('li');
+      msg.id = 'empty-msg'; msg.className = 'px-5 py-10 text-center text-gray-400 text-sm';
+      msg.textContent = 'Añade la primera tarea abajo';
+      ul.insertBefore(msg, ul.firstChild);
+    }
+  });
+}
+
+/* ── Duración ── */
+function setDuration(itemId, inp) {
+  var val = Math.max(1, parseInt(inp.value) || 1);
+  inp.value = val;
+  var li = document.getElementById('item-' + itemId);
+  if (li) li.dataset.duration = val;
+  fetch('/dashboard/checklists/item/' + itemId + '/duracion/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'duration=' + val,
+  });
+}
+
+/* ── Añadir tarea ── */
+function addItem() {
+  var inp = document.getElementById('new-item-input');
+  var text = inp.value.trim();
+  if (!text) return;
+  fetch('/dashboard/checklists/' + CL_PK + '/item/add/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'text=' + encodeURIComponent(text),
+  }).then(r => r.json()).then(function(d) {
+    if (!d.ok) return;
+    var em = document.getElementById('empty-msg');
+    if (em) em.remove();
+    inp.value = '';
+    var ul = document.getElementById('item-list');
+    var li = document.createElement('li');
+    li.id = 'item-' + d.id; li.dataset.id = d.id; li.dataset.duration = 1;
+    li.className = 'flex items-center gap-3 px-4 py-3 group hover:bg-gray-50 transition-colors';
+    li.innerHTML =
+      '<span class="drag-handle cursor-grab text-gray-300 hover:text-gray-500 flex-shrink-0 touch-none select-none">'
+      + '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></span>'
+      + '<button onclick="toggleItem(' + d.id + ', this)" class="w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all border-gray-300 hover:border-brand-400"></button>'
+      + '<span class="flex-1 text-sm text-gray-800">' + escHtml(d.text) + '</span>'
+      + '<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">'
+        + '<span class="text-xs text-gray-400">Dur:</span>'
+        + '<input type="number" min="1" max="999" value="1" onchange="setDuration(' + d.id + ', this)" class="w-12 text-xs text-center border border-gray-200 rounded-lg px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-brand-300"/>'
+      + '</div>'
+      + '<button onclick="deleteItem(' + d.id + ')" class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">'
+        + '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>';
+    ul.appendChild(li);
+    var done = parseInt(document.getElementById('done-count').textContent) || 0;
+    var tot  = parseInt(document.getElementById('total-count').textContent) || 0;
+    updateProgress(done, tot + 1);
+  });
+}
+
+/* ── Toggle público ── */
+function togglePublic() {
+  fetch('/dashboard/checklists/' + CL_PK + '/toggle-public/', {
+    method: 'POST', headers: { 'X-CSRFToken': CSRF },
+  }).then(r => r.json()).then(function(d) {
+    var btn = document.getElementById('toggle-public-btn');
+    btn.dataset.public = d.is_public ? 'true' : 'false';
+    if (d.is_public) {
+      btn.textContent = '🌐 Pública';
+      btn.className = btn.className.replace('bg-gray-100 border-gray-200 text-gray-500 hover:bg-gray-200','bg-green-50 border-green-200 text-green-700 hover:bg-green-100');
+    } else {
+      btn.textContent = '🔒 Privada';
+      btn.className = btn.className.replace('bg-green-50 border-green-200 text-green-700 hover:bg-green-100','bg-gray-100 border-gray-200 text-gray-500 hover:bg-gray-200');
+    }
+  });
+}
+
+function copyPublicLink() {
+  navigator.clipboard.writeText(PUBLIC_URL).then(function(){ showToast('✓ Enlace copiado'); })
+    .catch(function(){ prompt('Copia este enlace:', PUBLIC_URL); });
+}
+
+function openRenameInline() {
+  var title = document.getElementById('cl-title'), current = title.textContent.trim();
+  var inp = document.createElement('input');
+  inp.type = 'text'; inp.value = current;
+  inp.className = 'text-lg font-bold text-gray-900 border-b-2 border-brand-400 outline-none bg-transparent min-w-0 w-48';
+  title.replaceWith(inp); inp.focus(); inp.select();
+  function save() {
+    var name = inp.value.trim() || current;
+    var span = document.createElement('span');
+    span.id = 'cl-title'; span.className = 'text-lg font-bold text-gray-900 truncate'; span.textContent = name;
+    inp.replaceWith(span);
+    if (name === current) return;
+    fetch('/dashboard/checklists/' + CL_PK + '/renombrar/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'name=' + encodeURIComponent(name),
+    }).then(r => r.json()).then(function(d){ span.textContent = d.name; document.title = d.name + ' – Listas – Nooxial'; });
+  }
+  inp.addEventListener('blur', save);
+  inp.addEventListener('keydown', function(e){ if(e.key==='Enter') inp.blur(); if(e.key==='Escape'){ inp.value=current; inp.blur(); } });
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+{% endblock %}

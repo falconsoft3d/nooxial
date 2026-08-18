@@ -48,6 +48,35 @@ def dashboard(request):
 
     total_students    = AuthUser.objects.filter(is_active=True, is_staff=False).count()
 
+    # Puntos de gamificación: 1 por clase, 10 por examen aprobado
+    user_points = lessons_done * 1 + exams_passed * 10
+
+    # Top 10 ranking global de puntos
+    from django.db.models import Count, Value, IntegerField, ExpressionWrapper
+    from django.db.models.functions import Coalesce
+
+    lesson_pts = (LessonProgress.objects
+                  .values('student')
+                  .annotate(pts=Count('id')))
+    exam_pts   = (ExamAttempt.objects
+                  .filter(passed=True)
+                  .values('student')
+                  .annotate(pts=Count('id')))
+
+    # Build points dict per user
+    pts_map = {}
+    for row in lesson_pts:
+        pts_map[row['student']] = pts_map.get(row['student'], 0) + row['pts']
+    for row in exam_pts:
+        pts_map[row['student']] = pts_map.get(row['student'], 0) + row['pts'] * 10
+
+    top10_ids    = sorted(pts_map, key=lambda uid: pts_map[uid], reverse=True)[:10]
+    top10_users  = {u.pk: u for u in AuthUser.objects.filter(pk__in=top10_ids).select_related('profile')}
+    top10 = [
+        {'user': top10_users[uid], 'points': pts_map[uid]}
+        for uid in top10_ids if uid in top10_users
+    ]
+
     kpis = {
         'students':       total_students,
         'courses_done':   completed_count,
@@ -68,6 +97,10 @@ def dashboard(request):
         'certificates_count': certificates_count,
         'enrollments':        enrollments,
         'kpis':               kpis,
+        'user_points':        user_points,
+        'lessons_done':       lessons_done,
+        'exams_passed':       exams_passed,
+        'top10':              top10,
     })
 
 
@@ -718,7 +751,7 @@ def teacher_thread(request, student_id):
 
 @login_required
 def my_docs(request, folder_id=None):
-    from courses.models import UserFolder, UserFile, UserNote, UserWhiteboard, FolderShare, UserPresentation, UserCAD
+    from courses.models import UserFolder, UserFile, UserNote, UserWhiteboard, FolderShare, UserPresentation, UserCAD, SavedLink
     from django.db.models import Q
     current = None
     if folder_id:
@@ -1214,9 +1247,15 @@ def folder_capture_view(request, token):
     """Página pública de captura: cualquiera con el link puede subir archivos."""
     from courses.models import UserFolder
     folder = get_object_or_404(UserFolder, capture_token=token)
+    try:
+        importados = UserFolder.objects.get(user=folder.user, parent=folder, name='Importados')
+        files = list(importados.files.order_by('-created_at'))
+    except UserFolder.DoesNotExist:
+        files = []
     return render(request, 'courses/folder_capture.html', {
         'folder': folder,
         'token': str(token),
+        'files': files,
     })
 
 
@@ -1243,16 +1282,15 @@ def folder_capture_upload(request, token):
     for f in uploaded:
         if f.size > MAX_SIZE:
             continue
-        # Sanear el nombre: solo el basename
         import os
         safe_name = os.path.basename(f.name) or 'archivo'
-        UserFile.objects.create(
+        uf = UserFile.objects.create(
             folder=importados,
             user=folder.user,
             name=safe_name,
             file=f,
         )
-        saved.append(safe_name)
+        saved.append({'name': safe_name, 'url': uf.file.url, 'id': uf.pk})
 
     return JsonResponse({'ok': True, 'saved': saved})
 
@@ -1428,3 +1466,214 @@ def my_docs_search(request):
                 'sub': obj.folder.name if obj.folder else '—',
             })
     return JsonResponse({'results': results, 'q': q})
+
+
+# ─── ENLACES GUARDADOS ───────────────────────────────────────────────────────
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def my_docs_link_create(request):
+    from courses.models import SavedLink
+    from django.db.models import Q
+    if request.method == 'POST':
+        name      = request.POST.get('name', '').strip()
+        url       = request.POST.get('url', '').strip()
+        link_user = request.POST.get('link_user', '').strip()
+        link_pass = request.POST.get('link_pass', '').strip()
+        is_public = request.POST.get('is_public', '1') == '1'
+        if name and url:
+            SavedLink.objects.create(
+                user=request.user,
+                name=name,
+                url=url,
+                link_user=link_user,
+                link_pass=link_pass,
+                is_public=is_public,
+            )
+        next_url = request.POST.get('next', '')
+        from django.utils.http import url_has_allowed_host_and_scheme
+        if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+            return redirect(next_url)
+        return redirect('courses:saved_links')
+    return redirect('courses:my_docs')
+
+
+@login_required
+@require_POST
+def my_docs_link_delete(request, link_id):
+    from courses.models import SavedLink
+    link = get_object_or_404(SavedLink, pk=link_id, user=request.user)
+    link.delete()
+    return redirect('courses:saved_links')
+
+
+@login_required
+@require_POST
+def my_docs_link_toggle(request, link_id):
+    from courses.models import SavedLink
+    link = get_object_or_404(SavedLink, pk=link_id, user=request.user)
+    link.is_public = not link.is_public
+    link.save(update_fields=['is_public'])
+    return JsonResponse({'ok': True, 'is_public': link.is_public})
+
+
+@login_required
+def saved_links(request):
+    from courses.models import SavedLink
+    from django.db.models import Q
+    links = SavedLink.objects.filter(
+        Q(is_public=True) | Q(user=request.user)
+    ).select_related('user').order_by('-created_at')
+    return render(request, 'courses/saved_links.html', {
+        'active_nav': 'saved_links',
+        'links': links,
+    })
+
+
+# ─── LISTAS DE CHEQUEO ───────────────────────────────────────────────────────
+
+@login_required
+def checklists(request):
+    from courses.models import Checklist
+    from django.db.models import Q
+    own     = Checklist.objects.filter(user=request.user).prefetch_related('items')
+    public  = Checklist.objects.filter(is_public=True).exclude(user=request.user).prefetch_related('items')
+    return render(request, 'courses/checklists.html', {
+        'active_nav': 'checklists',
+        'own':    own,
+        'public': public,
+    })
+
+
+@login_required
+def checklist_create(request):
+    from courses.models import Checklist
+    if request.method == 'POST':
+        name      = request.POST.get('name', '').strip()
+        is_public = request.POST.get('is_public', '1') == '1'
+        if name:
+            cl = Checklist.objects.create(user=request.user, name=name, is_public=is_public)
+            return redirect('courses:checklist_detail', pk=cl.pk)
+    return redirect('courses:checklists')
+
+
+@login_required
+def checklist_detail(request, pk):
+    from courses.models import Checklist
+    from django.db.models import Q
+    cl = get_object_or_404(Checklist, pk=pk)
+    # Only owner or public checklists accessible to logged-in users
+    if not cl.is_public and cl.user != request.user:
+        return redirect('courses:checklists')
+    return render(request, 'courses/checklist_detail.html', {
+        'active_nav': 'checklists',
+        'cl': cl,
+        'is_owner': cl.user == request.user,
+        'public_url': request.build_absolute_uri('/dashboard/checklist/{}/'.format(cl.share_token)),
+    })
+
+
+@login_required
+@require_POST
+def checklist_delete(request, pk):
+    from courses.models import Checklist
+    cl = get_object_or_404(Checklist, pk=pk, user=request.user)
+    cl.delete()
+    return redirect('courses:checklists')
+
+
+@login_required
+@require_POST
+def checklist_toggle_public(request, pk):
+    from courses.models import Checklist
+    cl = get_object_or_404(Checklist, pk=pk, user=request.user)
+    cl.is_public = not cl.is_public
+    cl.save(update_fields=['is_public'])
+    return JsonResponse({'ok': True, 'is_public': cl.is_public})
+
+
+@login_required
+@require_POST
+def checklist_rename(request, pk):
+    from courses.models import Checklist
+    cl = get_object_or_404(Checklist, pk=pk, user=request.user)
+    name = request.POST.get('name', '').strip()
+    if name:
+        cl.name = name
+        cl.save(update_fields=['name', 'updated_at'])
+    return JsonResponse({'ok': True, 'name': cl.name})
+
+
+@login_required
+@require_POST
+def checklist_item_add(request, pk):
+    from courses.models import Checklist, ChecklistItem
+    cl = get_object_or_404(Checklist, pk=pk, user=request.user)
+    text = request.POST.get('text', '').strip()
+    if not text:
+        return JsonResponse({'ok': False, 'error': 'Texto vacío'}, status=400)
+    order = cl.items.count()
+    item  = ChecklistItem.objects.create(checklist=cl, text=text, order=order)
+    cl.save(update_fields=['updated_at'])
+    return JsonResponse({'ok': True, 'id': item.pk, 'text': item.text, 'is_done': item.is_done})
+
+
+@login_required
+@require_POST
+def checklist_item_toggle(request, item_id):
+    from courses.models import ChecklistItem
+    item = get_object_or_404(ChecklistItem, pk=item_id, checklist__user=request.user)
+    item.is_done = not item.is_done
+    item.save(update_fields=['is_done'])
+    cl = item.checklist
+    cl.save(update_fields=['updated_at'])
+    return JsonResponse({'ok': True, 'is_done': item.is_done,
+                         'done': cl.done_count, 'total': cl.total_count})
+
+
+@login_required
+@require_POST
+def checklist_item_delete(request, item_id):
+    from courses.models import ChecklistItem
+    item = get_object_or_404(ChecklistItem, pk=item_id, checklist__user=request.user)
+    cl = item.checklist
+    item.delete()
+    cl.save(update_fields=['updated_at'])
+    return JsonResponse({'ok': True, 'done': cl.done_count, 'total': cl.total_count})
+
+
+@login_required
+@require_POST
+def checklist_item_reorder(request, pk):
+    import json
+    from courses.models import Checklist, ChecklistItem
+    cl = get_object_or_404(Checklist, pk=pk, user=request.user)
+    try:
+        ids = json.loads(request.body)
+    except Exception:
+        return JsonResponse({'ok': False}, status=400)
+    for pos, item_id in enumerate(ids):
+        ChecklistItem.objects.filter(pk=item_id, checklist=cl).update(order=pos)
+    cl.save(update_fields=['updated_at'])
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@require_POST
+def checklist_item_set_duration(request, item_id):
+    from courses.models import ChecklistItem
+    item = get_object_or_404(ChecklistItem, pk=item_id, checklist__user=request.user)
+    try:
+        duration = max(1, int(request.POST.get('duration', 1)))
+    except ValueError:
+        duration = 1
+    item.duration = duration
+    item.save(update_fields=['duration'])
+    return JsonResponse({'ok': True, 'duration': item.duration})
+
+
+def public_checklist_view(request, token):
+    """Vista pública sin login para compartir una lista."""
+    from courses.models import Checklist
+    cl = get_object_or_404(Checklist, share_token=token)
+    return render(request, 'courses/public_checklist.html', {'cl': cl})

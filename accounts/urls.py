@@ -129,4 +129,5 @@ urlpatterns = [
     path('panel/versiones/<int:version_id>/eliminar/',    views.admin_version_delete,  name='admin_version_delete'),
     path('api/versiones/',                                views.api_all_versions,      name='api_all_versions'),
     path('api/versiones/<int:version_id>/',               views.api_version_changelog, name='api_version_changelog'),
+    path('api/nav-more/',                                 views.api_nav_more_save,     name='api_nav_more_save'),
 ]
