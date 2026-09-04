@@ -1,13 +1,21 @@
 {% extends "dashboard_base.html" %}
 {% block title %}{{ wb.title }} – Pizarra – Nooxial{% endblock %}
 
-{% block extra_head %}
+{% block dashboard_head %}
 <!-- Excalidraw CSS (obligatorio para que el toolbar sea visible) -->
 <link rel="stylesheet" href="https://unpkg.com/@excalidraw/excalidraw@0.17.6/dist/excalidraw.min.css">
 <style>
-  #excalidraw-wrapper { width: 100%; height: calc(100vh - 112px); }
+  #excalidraw-wrapper {
+    width: 100%;
+    height: calc(100vh - 112px);
+    position: relative;
+    isolation: isolate;
+    z-index: 1;
+    /* confina los elementos position:fixed de Excalidraw (menú, paneles de color) dentro de este
+       contenedor en vez del viewport, así respetan el ancho real del menú lateral (colapsado o no) */
+    transform: translateZ(0);
+  }
   .excalidraw { height: 100%; }
-  .excalidraw .App-menu { z-index: 10; }
 </style>
 {% endblock %}
 

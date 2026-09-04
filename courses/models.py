@@ -586,6 +586,11 @@ class UserFolder(models.Model):
     def is_shared(self):
         return self.share_token is not None
 
+    @property
+    def item_count(self):
+        return (self.files.count() + self.notes.count() + self.whiteboards.count()
+                 + self.presentations.count() + self.cad_files.count())
+
     def breadcrumb(self):
         crumbs = []
         node = self

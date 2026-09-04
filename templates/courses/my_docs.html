@@ -196,8 +196,7 @@
             </div>
             <p class="text-sm font-semibold text-gray-900 truncate">{{ folder.name }}</p>
             <p class="text-xs text-gray-400 mt-0.5">
-              {{ folder.files.count }} archivo{{ folder.files.count|pluralize:"s" }} ·
-              {{ folder.notes.count }} nota{{ folder.notes.count|pluralize:"s" }}
+              {{ folder.item_count }} elemento{{ folder.item_count|pluralize:"s" }}
             </p>
           </a>
           <div class="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity flex-wrap">
