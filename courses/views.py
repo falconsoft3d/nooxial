@@ -1179,30 +1179,54 @@ def folder_share_all(request, folder_id):
     return JsonResponse({'ok': True, 'shared_with_all': folder.shared_with_all})
 
 
+def _shared_access_chain(user, folder, company=None):
+    """
+    Busca, entre `folder` y sus carpetas ancestro, la más cercana que haya
+    sido compartida explícitamente con `user` (o su empresa) o con todos.
+
+    Esto permite que el acceso concedido sobre una carpeta se herede a sus
+    subcarpetas, sin necesidad de crear un `FolderShare` por cada una.
+
+    Devuelve la lista de carpetas desde esa carpeta compartida hasta
+    `folder` (ambas incluidas), útil como breadcrumb de solo lectura, o
+    `None` si ninguna carpeta de la cadena fue compartida con el usuario.
+    """
+    from courses.models import FolderShare
+    from django.db.models import Q
+    crumbs = folder.breadcrumb()
+    for i, node in enumerate(crumbs):
+        has_share = node.shared_with_all or FolderShare.objects.filter(
+            folder=node
+        ).filter(
+            Q(with_user=user) | (Q(with_company=company) if company else Q(pk__in=[]))
+        ).exists()
+        if has_share:
+            return crumbs[i:]
+    return None
+
+
 @login_required
 def shared_folder_view(request, folder_id):
-    """Vista de lectura de una carpeta compartida directamente con el usuario."""
-    from courses.models import UserFolder, UserFile, UserNote, UserWhiteboard, FolderShare
-    from accounts.models import Company
-    from django.db.models import Q
+    """
+    Vista de lectura de una carpeta compartida directamente con el usuario
+    (o de una subcarpeta dentro de una carpeta compartida: el acceso se
+    hereda de cualquier carpeta ancestro compartida).
+    """
+    from courses.models import UserFolder
     folder = get_object_or_404(UserFolder, pk=folder_id)
 
-    # Verificar acceso
     try:
         company = request.user.profile.company
     except Exception:
         company = None
 
-    has_access = folder.shared_with_all or FolderShare.objects.filter(
-        folder=folder
-    ).filter(
-        Q(with_user=request.user) | (Q(with_company=company) if company else Q(pk__in=[]))
-    ).exists()
+    access_chain = _shared_access_chain(request.user, folder, company)
 
-    if not has_access and folder.user != request.user:
+    if access_chain is None and folder.user != request.user:
         from django.http import HttpResponseForbidden
         return HttpResponseForbidden('No tienes acceso a esta carpeta.')
 
+    subfolders  = folder.children.order_by('name')
     files       = folder.files.order_by('name')
     notes       = folder.notes.order_by('title')
     whiteboards = folder.whiteboards.order_by('title')
@@ -1210,12 +1234,12 @@ def shared_folder_view(request, folder_id):
     return render(request, 'courses/my_docs.html', {
         'active_nav':    'my_docs',
         'current':       folder,
-        'subfolders':    [],
+        'subfolders':    subfolders,
         'files':         files,
         'notes':         notes,
         'whiteboards':   whiteboards,
         'root_folders':  [],
-        'breadcrumb':    [folder],
+        'breadcrumb':    access_chain if access_chain is not None else folder.breadcrumb(),
         'shared_folders': [],
         'readonly':      True,
         'shared_owner':  folder.user,

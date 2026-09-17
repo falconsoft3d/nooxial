@@ -13,7 +13,7 @@
     <svg class="w-3.5 h-3.5 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
     </svg>
-    <a href="{% url 'courses:my_docs_folder' crumb.pk %}"
+    <a href="{% if readonly %}{% url 'courses:shared_folder_view' crumb.pk %}{% else %}{% url 'courses:my_docs_folder' crumb.pk %}{% endif %}"
        class="{% if forloop.last %}text-gray-500{% else %}text-gray-700 hover:text-brand-600{% endif %} transition-colors truncate">
       {{ crumb.name }}
     </a>
@@ -107,6 +107,11 @@
     </div>
 
     <!-- Toolbar -->
+    {% if readonly %}
+    <div class="flex items-center gap-2 text-xs font-semibold text-blue-500 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 w-fit">
+      👁️ Carpeta compartida (solo lectura)
+    </div>
+    {% else %}
     <div class="flex flex-wrap items-center gap-2">
       {% if current %}
       <!-- Nueva subcarpeta -->
@@ -180,6 +185,7 @@
       </button>
       {% endif %}
     </div>
+    {% endif %}
 
     <!-- Subcarpetas -->
     {% if subfolders %}
@@ -188,7 +194,7 @@
       <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
         {% for folder in subfolders %}
         <div class="group bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-sm transition-shadow">
-          <a href="{% url 'courses:my_docs_folder' folder.pk %}" class="block">
+          <a href="{% if readonly %}{% url 'courses:shared_folder_view' folder.pk %}{% else %}{% url 'courses:my_docs_folder' folder.pk %}{% endif %}" class="block">
             <div class="w-10 h-10 bg-yellow-100 rounded-xl flex items-center justify-center mb-3">
               <svg class="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M20 6h-8l-2-2H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2z"/>
